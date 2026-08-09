@@ -17,8 +17,13 @@ DATABASE_URL = os.getenv(
 
 engine = create_engine(
     DATABASE_URL,
-    pool_pre_ping=True,   # automatically reconnect on dropped connections
-    echo=False,           # set True to print every SQL statement (useful for debugging)
+    pool_size=10,
+    max_overflow=20,
+    pool_recycle=1800,
+    pool_timeout=30,
+    pool_pre_ping=True,
+    connect_args={"sslmode": "require"} if "neon.tech" in DATABASE_URL else {},
+    echo=False,
 )
 
 SessionLocal = sessionmaker(bind=engine, autocommit=False, autoflush=False)

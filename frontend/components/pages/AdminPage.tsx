@@ -27,12 +27,12 @@ function StatCard({ label, value, detail, icon: Icon, tone }: {
   return (
     <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="card p-4 min-w-0">
       <div className="flex items-start justify-between gap-3">
-        <div className={cn("w-9 h-9 rounded-xl flex items-center justify-center", tone)}><Icon size={16} /></div>
-        <Activity size={13} className="text-[var(--text-subtle)]" />
+        <div className={cn("w-10 h-10 rounded-xl flex items-center justify-center", tone)}><Icon size={18} /></div>
+        <Activity size={15} className="text-[var(--text-subtle)]" />
       </div>
-      <p className="text-2xl font-bold text-[var(--text)] mt-4 truncate">{value}</p>
-      <p className="text-sm font-semibold text-[var(--text-muted)] mt-1">{label}</p>
-      {detail && <p className="text-xs text-[var(--text-subtle)] mt-1 truncate">{detail}</p>}
+      <p className="text-3xl font-bold text-[var(--text)] mt-4 truncate">{value}</p>
+      <p className="text-base font-semibold text-[var(--text-muted)] mt-1">{label}</p>
+      {detail && <p className="text-sm text-[var(--text-subtle)] mt-1 truncate">{detail}</p>}
     </motion.div>
   );
 }
@@ -202,9 +202,9 @@ export default function AdminPage() {
             <Shield size={21} className="text-amber-600" />
           </div>
           <div>
-            <p className="text-xs font-semibold uppercase tracking-[.18em] text-amber-600">Super Admin</p>
-            <h1 className="text-2xl font-bold text-[var(--text)]">Control Center</h1>
-            <p className="text-sm text-[var(--text-muted)] mt-1">Manage accounts, plans, usage and platform activity.</p>
+            <p className="text-sm font-semibold uppercase tracking-[.18em] text-amber-600">Super Admin</p>
+            <h1 className="text-3xl font-bold text-[var(--text)]">Control Center</h1>
+            <p className="text-base text-[var(--text-muted)] mt-1">Manage accounts, plans, usage and platform activity.</p>
           </div>
         </div>
         <button onClick={reload} disabled={loading} className="btn-ghost self-start lg:self-auto">
@@ -227,7 +227,7 @@ export default function AdminPage() {
       <div className="flex items-center gap-1 overflow-x-auto border-b border-[var(--border)]">
         {tabs.map(({ id, label, icon: Icon }) => (
           <button key={id} onClick={() => setTab(id)}
-            className={cn("flex items-center gap-2 px-4 py-3 text-sm font-semibold border-b-2 -mb-px whitespace-nowrap",
+            className={cn("flex items-center gap-2 px-4 py-3 text-base font-semibold border-b-2 -mb-px whitespace-nowrap",
               tab === id ? "border-[var(--primary)] text-[var(--primary)]" : "border-transparent text-[var(--text-muted)] hover:text-[var(--text)]")}>
             <Icon size={14} />{label}
           </button>
@@ -238,17 +238,17 @@ export default function AdminPage() {
       {tab === "overview" && stats && (
         <div className="grid grid-cols-1 xl:grid-cols-2 gap-4">
           <div className="card p-5">
-            <h2 className="font-bold text-[var(--text)] mb-4">Conversions</h2>
+            <h2 className="text-base font-bold text-[var(--text)] mb-4">Conversions</h2>
             {[
               { label: "Successful", value: stats.successful_conversions, total: stats.total_conversions, color: "bg-emerald-500" },
               { label: "Failed",     value: stats.failed_conversions,     total: stats.total_conversions, color: "bg-red-500" },
             ].map(item => (
               <div key={item.label} className="mb-4 last:mb-0">
-                <div className="flex justify-between text-xs mb-1.5">
+                <div className="flex justify-between text-sm mb-1.5">
                   <span className="text-[var(--text-muted)]">{item.label}</span>
                   <strong className="text-[var(--text)]">{item.value}</strong>
                 </div>
-                <div className="h-2 rounded-full bg-[var(--surface)] overflow-hidden">
+                <div className="h-2.5 rounded-full bg-[var(--surface)] overflow-hidden">
                   <motion.div initial={{ width: 0 }}
                     animate={{ width: `${item.total ? (item.value / item.total) * 100 : 0}%` }}
                     className={cn("h-full rounded-full", item.color)} />
@@ -257,19 +257,19 @@ export default function AdminPage() {
             ))}
           </div>
           <div className="card p-5">
-            <h2 className="font-bold text-[var(--text)] mb-4">Plan Distribution</h2>
+            <h2 className="text-base font-bold text-[var(--text)] mb-4">Plan Distribution</h2>
             {[
               { label: "Free", value: stats.free_users, color: "bg-slate-400" },
               { label: "Pro",  value: stats.pro_users,  color: "bg-amber-500" },
             ].map(item => (
               <div key={item.label} className="flex items-center gap-3 mb-4 last:mb-0">
-                <span className={cn("w-2.5 h-2.5 rounded-full flex-shrink-0", item.color)} />
+                <span className={cn("w-3 h-3 rounded-full flex-shrink-0", item.color)} />
                 <div className="flex-1">
-                  <div className="flex justify-between text-sm">
+                  <div className="flex justify-between text-base">
                     <span className="text-[var(--text-muted)]">{item.label}</span>
                     <strong className="text-[var(--text)]">{item.value}</strong>
                   </div>
-                  <div className="h-1.5 bg-[var(--surface)] rounded-full mt-1.5 overflow-hidden">
+                  <div className="h-2 bg-[var(--surface)] rounded-full mt-1.5 overflow-hidden">
                     <div className={cn("h-full rounded-full", item.color)}
                       style={{ width: `${stats.total_users ? (item.value / stats.total_users) * 100 : 0}%` }} />
                   </div>
@@ -277,7 +277,7 @@ export default function AdminPage() {
               </div>
             ))}
             <div className="divider my-4" />
-            <div className="flex justify-between text-sm">
+            <div className="flex justify-between text-base">
               <span className="text-[var(--text-muted)]">Active (last 30 days)</span>
               <strong className="text-[var(--text)]">{stats.recently_active_users}</strong>
             </div>
@@ -293,12 +293,12 @@ export default function AdminPage() {
               <Search size={15} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-[var(--text-subtle)]" />
               <input value={search} onChange={e => setSearch(e.target.value)}
                 placeholder="Search by name or email"
-                className="w-full pl-10 pr-4 py-2.5 rounded-xl border border-[var(--border)] bg-[var(--card)] text-sm text-[var(--text)] outline-none focus:border-[var(--primary)]" />
+                className="w-full pl-10 pr-4 py-2.5 rounded-xl border border-[var(--border)] bg-[var(--card)] text-base text-[var(--text)] outline-none focus:border-[var(--primary)]" />
             </div>
             <div className="flex items-center gap-2 overflow-x-auto">
               {(["all","free","pro","active","suspended"] as UserFilter[]).map(f => (
                 <button key={f} onClick={() => setFilter(f)}
-                  className={cn("px-3.5 py-2 rounded-lg text-sm font-semibold whitespace-nowrap",
+                  className={cn("px-3.5 py-2 rounded-lg text-base font-semibold whitespace-nowrap",
                     filter === f ? "bg-[var(--primary)] text-white" : "bg-[var(--card)] border border-[var(--border)] text-[var(--text-muted)]")}>
                   {f.charAt(0).toUpperCase() + f.slice(1)}
                 </button>
@@ -311,7 +311,7 @@ export default function AdminPage() {
                 <thead>
                   <tr className="border-b border-[var(--border)]">
                     {["User","Plan","Status","Projects","Conversions","Last Login","Action"].map(h => (
-                      <th key={h} className="px-5 py-3.5 text-left text-xs uppercase tracking-wider font-bold text-[var(--text-muted)]">{h}</th>
+                      <th key={h} className="px-5 py-3.5 text-left text-sm uppercase tracking-wider font-bold text-[var(--text-muted)]">{h}</th>
                     ))}
                   </tr>
                 </thead>
@@ -325,28 +325,28 @@ export default function AdminPage() {
                       className="border-b border-[var(--border)] last:border-none hover:bg-[var(--surface)]">
                       <td className="px-5 py-3.5">
                         <div className="flex items-center gap-3 text-left">
-                          <span className="w-9 h-9 rounded-full bg-[var(--primary-light)] flex items-center justify-center text-sm font-bold text-[var(--primary)]">
+                          <span className="w-10 h-10 rounded-full bg-[var(--primary-light)] flex items-center justify-center text-base font-bold text-[var(--primary)]">
                             {initials(u.full_name)}
                           </span>
                           <span>
-                            <strong className="block text-sm text-[var(--text)]">{u.full_name}</strong>
-                            <small className="block text-xs text-[var(--text-muted)]">{u.email}</small>
+                            <strong className="block text-base text-[var(--text)]">{u.full_name}</strong>
+                            <small className="block text-sm text-[var(--text-muted)]">{u.email}</small>
                           </span>
                         </div>
                       </td>
                       <td className="px-5">
-                        <span className={cn("badge text-xs", u.plan === "pro" ? "bg-amber-50 dark:bg-amber-500/10 text-amber-600" : "badge-gray")}>
+                        <span className={cn("badge text-sm", u.plan === "pro" ? "bg-amber-50 dark:bg-amber-500/10 text-amber-600" : "badge-gray")}>
                           {u.plan === "pro" ? "Pro" : "Free"}
                         </span>
                       </td>
                       <td className="px-5">
-                        <span className={cn("badge text-xs", u.is_active ? "badge-success" : "badge-danger")}>
+                        <span className={cn("badge text-sm", u.is_active ? "badge-success" : "badge-danger")}>
                           {u.is_active ? "Active" : "Suspended"}
                         </span>
                       </td>
-                      <td className="px-5 text-sm text-[var(--text-muted)]">{u.project_count}</td>
-                      <td className="px-5 text-sm text-[var(--text-muted)]">{u.conversions_used_this_month} used</td>
-                      <td className="px-5 text-sm text-[var(--text-muted)]">{formatDate(u.last_login)}</td>
+                      <td className="px-5 text-base text-[var(--text-muted)]">{u.project_count}</td>
+                      <td className="px-5 text-base text-[var(--text-muted)]">{u.conversions_used_this_month} used</td>
+                      <td className="px-5 text-base text-[var(--text-muted)]">{formatDate(u.last_login)}</td>
                       <td className="px-5">
                         <div className="flex gap-1">
                           <button title="View user"
@@ -395,7 +395,7 @@ export default function AdminPage() {
                   <thead>
                     <tr className="border-b border-[var(--border)]">
                       {["Project","Owner","DB Type","Files","Created","Action"].map(h => (
-                        <th key={h} className="px-5 py-3.5 text-left text-xs uppercase tracking-wider font-bold text-[var(--text-muted)]">{h}</th>
+                        <th key={h} className="px-5 py-3.5 text-left text-sm uppercase tracking-wider font-bold text-[var(--text-muted)]">{h}</th>
                       ))}
                     </tr>
                   </thead>
@@ -407,15 +407,15 @@ export default function AdminPage() {
                         return (
                           <tr key={p.id} className="border-b border-[var(--border)] last:border-none hover:bg-[var(--surface)]">
                             <td className="px-5 py-3.5">
-                              <p className="font-semibold text-sm text-[var(--text)]">{p.name}</p>
-                              <p className="text-xs text-[var(--text-muted)]">{p.description || "—"}</p>
+                              <p className="font-semibold text-base text-[var(--text)]">{p.name}</p>
+                              <p className="text-sm text-[var(--text-muted)]">{p.description || "—"}</p>
                             </td>
-                            <td className="px-5 text-sm text-[var(--text-muted)]">
+                            <td className="px-5 text-base text-[var(--text-muted)]">
                               {owner ? <><span className="block font-medium text-[var(--text)]">{owner.full_name}</span><span>{owner.email}</span></> : `User #${p.user_id}`}
                             </td>
-                            <td className="px-5 text-sm text-[var(--text-muted)]">{p.db_type}</td>
-                            <td className="px-5 text-sm text-[var(--text-muted)]">{(p.files as any[]).length}</td>
-                            <td className="px-5 text-sm text-[var(--text-muted)]">{formatDate(p.created_at)}</td>
+                            <td className="px-5 text-base text-[var(--text-muted)]">{p.db_type}</td>
+                            <td className="px-5 text-base text-[var(--text-muted)]">{(p.files as any[]).length}</td>
+                            <td className="px-5 text-base text-[var(--text-muted)]">{formatDate(p.created_at)}</td>
                             <td className="px-5">
                               <button onClick={() => handleDeleteProject(p.id)} className="icon-button text-red-500" title="Delete project">
                                 <Trash2 size={14} />
@@ -487,29 +487,29 @@ function UserDetail({ user, projects, adminId, onBack, onSuspend, onPlanChange, 
             <span className={cn("badge text-xs", user.plan === "pro" ? "bg-amber-50 dark:bg-amber-500/10 text-amber-600" : "badge-gray")}>
               {user.plan === "pro" ? "Pro" : "Free"}
             </span>
-            <span className={cn("badge text-xs", user.is_active ? "badge-success" : "badge-danger")}>
+            <span className={cn("badge text-sm", user.is_active ? "badge-success" : "badge-danger")}>
               {user.is_active ? "Active" : "Suspended"}
             </span>
           </div>
-          <p className="text-sm text-[var(--text-muted)] mt-1">{user.email}</p>
-          <p className="text-sm text-[var(--text-subtle)] mt-0.5">Joined {formatDate(user.created_at)} · Last login {formatDate(user.last_login)}</p>
+          <p className="text-base text-[var(--text-muted)] mt-1">{user.email}</p>
+          <p className="text-base text-[var(--text-subtle)] mt-0.5">Joined {formatDate(user.created_at)} · Last login {formatDate(user.last_login)}</p>
         </div>
         <div className="flex flex-wrap gap-2">
           <button onClick={onSuspend} className="btn-ghost">
-            {user.is_active ? <><Ban size={14} /> Suspend</> : <><CheckCircle size={14} /> Reactivate</>}
+            {user.is_active ? <><Ban size={16} /> Suspend</> : <><CheckCircle size={16} /> Reactivate</>}
           </button>
           {String(user.id) !== adminId && (
-            <button onClick={onDelete} className="btn-ghost text-red-500"><Trash2 size={14} /> Delete</button>
+            <button onClick={onDelete} className="btn-ghost text-red-500"><Trash2 size={16} /> Delete</button>
           )}
         </div>
       </div>
 
       {/* Stats */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
-        <div className="card p-4"><FolderOpen size={16} className="text-[var(--primary)] mb-2" /><p className="text-xl font-bold text-[var(--text)]">{user.project_count}</p><p className="text-sm font-medium text-[var(--text-muted)]">Projects</p></div>
-        <div className="card p-4"><FileCode size={16} className="text-[var(--primary)] mb-2" /><p className="text-xl font-bold text-[var(--text)]">{user.conversion_count}</p><p className="text-sm font-medium text-[var(--text-muted)]">Total Conversions</p></div>
-        <div className="card p-4"><TrendingUp size={16} className="text-[var(--primary)] mb-2" /><p className="text-xl font-bold text-[var(--text)]">{user.conversions_used_this_month}</p><p className="text-sm font-medium text-[var(--text-muted)]">Used This Month</p></div>
-        <div className="card p-4"><UserRound size={16} className="text-[var(--primary)] mb-2" /><p className="text-xl font-bold text-[var(--text)] capitalize">{user.role}</p><p className="text-sm font-medium text-[var(--text-muted)]">Role</p></div>
+        <div className="card p-4"><FolderOpen size={18} className="text-[var(--primary)] mb-2" /><p className="text-2xl font-bold text-[var(--text)]">{user.project_count}</p><p className="text-base font-medium text-[var(--text-muted)]">Projects</p></div>
+        <div className="card p-4"><FileCode size={18} className="text-[var(--primary)] mb-2" /><p className="text-2xl font-bold text-[var(--text)]">{user.conversion_count}</p><p className="text-base font-medium text-[var(--text-muted)]">Total Conversions</p></div>
+        <div className="card p-4"><TrendingUp size={18} className="text-[var(--primary)] mb-2" /><p className="text-2xl font-bold text-[var(--text)]">{user.conversions_used_this_month}</p><p className="text-base font-medium text-[var(--text-muted)]">Used This Month</p></div>
+        <div className="card p-4"><UserRound size={18} className="text-[var(--primary)] mb-2" /><p className="text-2xl font-bold text-[var(--text)] capitalize">{user.role}</p><p className="text-base font-medium text-[var(--text-muted)]">Role</p></div>
       </div>
 
       {/* Tabs */}
@@ -520,7 +520,7 @@ function UserDetail({ user, projects, adminId, onBack, onSuspend, onPlanChange, 
           { id: "files",    label: "Generated files" },
         ].map(t => (
           <button key={t.id} onClick={() => setActiveSection(t.id as any)}
-            className={cn("px-4 py-3 text-sm font-semibold border-b-2 -mb-px whitespace-nowrap transition-colors",
+            className={cn("px-4 py-3 text-base font-semibold border-b-2 -mb-px whitespace-nowrap transition-colors",
               activeSection === t.id
                 ? "border-[var(--primary)] text-[var(--primary)]"
                 : "border-transparent text-[var(--text-muted)] hover:text-[var(--text)]")}>
@@ -533,7 +533,7 @@ function UserDetail({ user, projects, adminId, onBack, onSuspend, onPlanChange, 
       {activeSection === "profile" && (
         <div className="grid grid-cols-1 xl:grid-cols-2 gap-4">
           <div className="card p-5">
-            <h2 className="font-bold text-[var(--text)] mb-4">Account Details</h2>
+            <h2 className="text-base font-bold text-[var(--text)] mb-4">Account Details</h2>
             <div className="space-y-0">
               {[
                 { label: "Full Name",      value: user.full_name },
@@ -543,38 +543,38 @@ function UserDetail({ user, projects, adminId, onBack, onSuspend, onPlanChange, 
                 { label: "Last Login",     value: formatDate(user.last_login) },
                 { label: "Email Verified", value: user.email_verified ? "✓ Verified" : "✗ Not verified" },
               ].map(row => (
-                <div key={row.label} className="flex items-center justify-between gap-4 py-2.5 border-b border-[var(--border)] last:border-none">
-                  <span className="text-sm text-[var(--text-muted)]">{row.label}</span>
-                  <strong className="text-sm text-right text-[var(--text)]">{row.value}</strong>
+                <div key={row.label} className="flex items-center justify-between gap-4 py-3 border-b border-[var(--border)] last:border-none">
+                  <span className="text-base text-[var(--text-muted)]">{row.label}</span>
+                  <strong className="text-base text-right text-[var(--text)]">{row.value}</strong>
                 </div>
               ))}
             </div>
           </div>
           <div className="card p-5">
             <div className="flex items-center justify-between mb-4">
-              <h2 className="font-bold text-[var(--text)]">Subscription Controls</h2>
-              <Zap size={17} className="text-amber-500" />
+              <h2 className="text-base font-bold text-[var(--text)]">Subscription Controls</h2>
+              <Zap size={19} className="text-amber-500" />
             </div>
             <div className="space-y-4">
               <div>
-                <label className="block text-sm font-semibold text-[var(--text-muted)] mb-1.5">Plan</label>
+                <label className="block text-base font-semibold text-[var(--text-muted)] mb-1.5">Plan</label>
                 <select value={user.plan} onChange={e => onPlanChange(e.target.value as "free" | "pro")} className="admin-select">
                   <option value="free">Free</option>
                   <option value="pro">Pro</option>
                 </select>
               </div>
               <div>
-                <label className="block text-sm font-semibold text-[var(--text-muted)] mb-1.5">Role</label>
+                <label className="block text-base font-semibold text-[var(--text-muted)] mb-1.5">Role</label>
                 <select value={user.role} onChange={e => onRoleChange(e.target.value as "user" | "admin")} className="admin-select">
                   <option value="user">User</option>
                   <option value="admin">Admin</option>
                 </select>
               </div>
               <div className="flex items-center gap-3 pt-1">
-                <button onClick={onResetConversions} className="btn-ghost text-sm">
-                  <RefreshCw size={14} /> Reset Monthly Conversions
+                <button onClick={onResetConversions} className="btn-ghost text-base">
+                  <RefreshCw size={15} /> Reset Monthly Conversions
                 </button>
-                <span className="text-sm text-[var(--text-muted)]">{user.conversions_used_this_month} used</span>
+                <span className="text-base text-[var(--text-muted)]">{user.conversions_used_this_month} used</span>
               </div>
             </div>
           </div>
@@ -594,16 +594,16 @@ function UserDetail({ user, projects, adminId, onBack, onSuspend, onPlanChange, 
               <div key={p.id} className="card p-5">
                 <div className="flex items-start justify-between gap-3">
                   <div>
-                    <h3 className="font-bold text-[var(--text)]">{p.name}</h3>
-                    <p className="text-sm text-[var(--text-muted)] mt-0.5">{p.db_type} · {(p.files as any[]).length} files</p>
+                    <h3 className="text-base font-bold text-[var(--text)]">{p.name}</h3>
+                    <p className="text-base text-[var(--text-muted)] mt-0.5">{p.db_type} · {(p.files as any[]).length} files</p>
                     {p.description && <p className="text-sm text-[var(--text-subtle)] mt-1">{p.description}</p>}
                   </div>
                   <button onClick={() => onDeleteProject(p.id)} className="icon-button text-red-500 flex-shrink-0" title="Delete">
-                    <Trash2 size={14} />
+                    <Trash2 size={15} />
                   </button>
                 </div>
                 <div className="divider my-3" />
-                <div className="flex justify-between text-sm text-[var(--text-muted)]">
+                <div className="flex justify-between text-base text-[var(--text-muted)]">
                   <span>{(p.files as any[]).filter((f: any) => f.status === "completed").length} completed</span>
                   <span>Created {formatDate(p.created_at)}</span>
                 </div>
@@ -636,8 +636,8 @@ function GeneratedFilesPanel({ files }: { files: any[] }) {
     <>
       <div className="card overflow-hidden">
         <div className="px-5 py-4 border-b border-[var(--border)]">
-          <h2 className="font-bold text-[var(--text)]">Generated SQL, TXT, and JSON</h2>
-          <p className="text-sm text-[var(--text-muted)] mt-1">All files generated by this user across all projects.</p>
+          <h2 className="text-base font-bold text-[var(--text)]">Generated SQL, TXT, and JSON</h2>
+          <p className="text-base text-[var(--text-muted)] mt-1">All files generated by this user across all projects.</p>
         </div>
 
         {localFiles.length === 0 ? (
@@ -653,20 +653,20 @@ function GeneratedFilesPanel({ files }: { files: any[] }) {
               return (
                 <div key={f.id ?? i} className="flex items-center gap-3 px-5 py-3.5 hover:bg-[var(--surface)] transition-colors group">
                   {/* Icon */}
-                  <div className="w-9 h-9 rounded-lg bg-emerald-50 dark:bg-emerald-500/10 flex items-center justify-center flex-shrink-0">
-                    <FileCode size={16} className="text-emerald-600" />
+                  <div className="w-10 h-10 rounded-lg bg-emerald-50 dark:bg-emerald-500/10 flex items-center justify-center flex-shrink-0">
+                    <FileCode size={18} className="text-emerald-600" />
                   </div>
 
                   {/* Info */}
                   <div className="flex-1 min-w-0">
-                    <p className="text-sm font-semibold text-[var(--text)] truncate">{f.name}</p>
-                    <p className="text-xs text-[var(--text-muted)]">
+                    <p className="text-base font-semibold text-[var(--text)] truncate">{f.name}</p>
+                    <p className="text-sm text-[var(--text-muted)]">
                       {f.projectName} · {f.status}{f.stats ? ` · ${f.stats.tables ?? 0} tables` : ""}
                     </p>
                   </div>
 
                   {/* Status badge */}
-                  <span className={cn("badge text-xs flex-shrink-0 mr-2",
+                  <span className={cn("badge text-sm flex-shrink-0 mr-2",
                     f.status === "completed" ? "badge-success" :
                     f.status === "failed"    ? "badge-danger"  : "badge-gray")}>
                     {f.status}
@@ -674,23 +674,20 @@ function GeneratedFilesPanel({ files }: { files: any[] }) {
 
                   {/* Action buttons */}
                   <div className="flex items-center gap-1 flex-shrink-0">
-                    {/* Open / Inspect */}
                     <button
                       disabled={!hasSql}
                       onClick={() => setInspecting(f)}
                       title="View SQL"
                       className="icon-button disabled:opacity-30"
                     >
-                      <Eye size={13} />
+                      <Eye size={15} />
                     </button>
-
-                    {/* Delete (local only — removes from view) */}
                     <button
                       onClick={() => deleteFile(f.id)}
                       title="Remove from list"
                       className="icon-button text-red-500"
                     >
-                      <Trash2 size={13} />
+                      <Trash2 size={15} />
                     </button>
                   </div>
                 </div>
@@ -718,32 +715,32 @@ function GeneratedFilesPanel({ files }: { files: any[] }) {
               {/* Modal header */}
               <div className="flex items-center justify-between gap-3 px-5 py-4 border-b border-[var(--border)]">
                 <div>
-                  <h3 className="font-bold text-[var(--text)]">{inspecting.name}</h3>
-                  <p className="text-sm text-[var(--text-muted)] mt-0.5">
+                  <h3 className="text-base font-bold text-[var(--text)]">{inspecting.name}</h3>
+                  <p className="text-base text-[var(--text-muted)] mt-0.5">
                     {inspecting.projectName} · {inspecting.stats?.tables ?? 0} tables
                   </p>
                 </div>
                 <div className="flex items-center gap-1.5">
                   <button
                     onClick={() => { downloadText(inspecting.sql, `${inspecting.name?.replace(/\.[^.]+$/, "")}.sql`); }}
-                    className="btn-ghost text-sm px-3 py-1.5"
+                    className="btn-ghost text-base px-3 py-1.5"
                     title="Download SQL"
                   >
-                    <Download size={14} /> SQL
+                    <Download size={15} /> SQL
                   </button>
                   <button
                     onClick={() => { downloadText(inspecting.sql, `${inspecting.name?.replace(/\.[^.]+$/, "")}.txt`); }}
-                    className="btn-ghost text-sm px-3 py-1.5"
+                    className="btn-ghost text-base px-3 py-1.5"
                     title="Download TXT"
                   >
-                    <FileText size={14} /> TXT
+                    <FileText size={15} /> TXT
                   </button>
                   <button
                     onClick={() => { downloadJSON({ filename: inspecting.name, sql: inspecting.sql, stats: inspecting.stats }, `${inspecting.name?.replace(/\.[^.]+$/, "")}.json`); }}
-                    className="btn-ghost text-sm px-3 py-1.5"
+                    className="btn-ghost text-base px-3 py-1.5"
                     title="Download JSON"
                   >
-                    <FileJson size={14} /> JSON
+                    <FileJson size={15} /> JSON
                   </button>
                   <button onClick={() => setInspecting(null)} className="icon-button ml-1">
                     <X size={16} />

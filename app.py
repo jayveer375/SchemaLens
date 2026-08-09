@@ -4,8 +4,9 @@ app.py — FastAPI backend
 Full persistence layer: users, images, conversions, projects, history, profile, activity.
 """
 
-from fastapi import FastAPI, HTTPException, Depends, Request, UploadFile, File, Form
+from fastapi import FastAPI, HTTPException, Depends, Request, UploadFile, File, Form, BackgroundTasks
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.staticfiles import StaticFiles
 from sqlalchemy.orm import Session
 import bcrypt
 import datetime
@@ -14,10 +15,14 @@ import os
 
 from database import get_db
 from models import User, Image, Conversion, ApiUsage, ExportLog, UserActivity, ProjectImage
-from utils.activity_logger import log_activity
+from utils.activity_logger import log_activity, log_activity_bg, log_login_success_bg
 from utils.file_storage import save_uploaded_image
 
 app = FastAPI(title="Schemalens API")
+
+# Mount static directory for uploads (e.g. avatars)
+os.makedirs("uploads", exist_ok=True)
+app.mount("/uploads", StaticFiles(directory="uploads"), name="uploads")
 
 app.add_middleware(
     CORSMiddleware,
@@ -43,7 +48,7 @@ def home():
 
 # ── Register ──────────────────────────────────────────────────────────────────
 @app.post("/register")
-def register(payload: dict, request: Request, db: Session = Depends(get_db)):
+def register(payload: dict, request: Request, background_tasks: BackgroundTasks, db: Session = Depends(get_db)):
     full_name = payload.get("full_name", "").strip()
     email     = payload.get("email", "").strip().lower()
     password  = payload.get("password", "")
@@ -67,16 +72,18 @@ def register(payload: dict, request: Request, db: Session = Depends(get_db)):
     db.commit()
     db.refresh(new_user)
 
-    log_activity(db, "register", user_id=new_user.id,
-                 description=f"New account: {email}", ip_address=get_ip(request),
-                 user_agent=request.headers.get("User-Agent"))
+    background_tasks.add_task(
+        log_activity_bg, "register", user_id=new_user.id,
+        description=f"New account: {email}", ip_address=get_ip(request),
+        user_agent=request.headers.get("User-Agent")
+    )
 
     return {"message": "Account created successfully", "user": _user_dict(new_user)}
 
 
 # ── Login ─────────────────────────────────────────────────────────────────────
 @app.post("/login")
-def login(payload: dict, request: Request, db: Session = Depends(get_db)):
+def login(payload: dict, request: Request, background_tasks: BackgroundTasks, db: Session = Depends(get_db)):
     email    = payload.get("email", "").strip().lower()
     password = payload.get("password", "")
 
@@ -85,23 +92,37 @@ def login(payload: dict, request: Request, db: Session = Depends(get_db)):
 
     user = db.query(User).filter(User.email == email).first()
     if not user:
-        log_activity(db, "login_failed", description=f"Unknown email: {email}", ip_address=get_ip(request))
+        background_tasks.add_task(
+            log_activity_bg, "login_failed", description=f"Unknown email: {email}", ip_address=get_ip(request)
+        )
         raise HTTPException(status_code=401, detail="Invalid email or password")
     if not user.is_active:
         raise HTTPException(status_code=403, detail="Account is disabled")
 
     if not bcrypt.checkpw(password.encode(), user.password_hash.encode()):
-        log_activity(db, "login_failed", user_id=user.id,
-                     description=f"Wrong password for {email}", ip_address=get_ip(request))
+        background_tasks.add_task(
+            log_activity_bg, "login_failed", user_id=user.id,
+            description=f"Wrong password for {email}", ip_address=get_ip(request)
+        )
         raise HTTPException(status_code=401, detail="Invalid email or password")
 
-    user.last_login = datetime.datetime.utcnow()
-    db.commit()
+    # Enqueue user.last_login update and login logging to run in the background
+    background_tasks.add_task(
+        log_login_success_bg, user.id, ip_address=get_ip(request),
+        user_agent=request.headers.get("User-Agent")
+    )
 
-    log_activity(db, "login", user_id=user.id, description="Login successful",
-                 ip_address=get_ip(request), user_agent=request.headers.get("User-Agent"))
+    # Fetch projects and quick history to send back immediately in a single payload
+    from models import Project as ProjectModel, QuickHistory
+    projects = db.query(ProjectModel).filter(ProjectModel.user_id == user.id).all()
+    q_history = db.query(QuickHistory).filter(QuickHistory.user_id == user.id).order_by(QuickHistory.created_at.desc()).limit(20).all()
 
-    return {"message": "Login successful", "user": _user_dict(user)}
+    return {
+        "message": "Login successful",
+        "user": _user_dict(user),
+        "projects": [_project_dict(p) for p in projects],
+        "quick_history": [_quick_history_dict(e) for e in q_history],
+    }
 
 
 # ── Get user profile + all their data ────────────────────────────────────────
@@ -115,7 +136,7 @@ def get_user(user_id: int, db: Session = Depends(get_db)):
 
 # ── Change password ───────────────────────────────────────────────────────────
 @app.put("/user/{user_id}/password")
-def change_password(user_id: int, payload: dict, request: Request, db: Session = Depends(get_db)):
+def change_password(user_id: int, payload: dict, request: Request, background_tasks: BackgroundTasks, db: Session = Depends(get_db)):
     current_pw = payload.get("current_password", "")
     new_pw     = payload.get("new_password", "")
 
@@ -134,15 +155,17 @@ def change_password(user_id: int, payload: dict, request: Request, db: Session =
     user.password_hash = bcrypt.hashpw(new_pw.encode(), bcrypt.gensalt()).decode()
     db.commit()
 
-    log_activity(db, "password_change", user_id=user_id,
-                 description="Password changed successfully", ip_address=get_ip(request))
+    background_tasks.add_task(
+        log_activity_bg, "password_change", user_id=user_id,
+        description="Password changed successfully", ip_address=get_ip(request)
+    )
 
     return {"message": "Password updated successfully"}
 
 
 
 @app.put("/user/{user_id}/profile")
-def update_profile(user_id: int, payload: dict, request: Request, db: Session = Depends(get_db)):
+def update_profile(user_id: int, payload: dict, request: Request, background_tasks: BackgroundTasks, db: Session = Depends(get_db)):
     user = db.query(User).filter(User.id == user_id).first()
     if not user:
         raise HTTPException(status_code=404, detail="User not found")
@@ -165,15 +188,22 @@ def update_profile(user_id: int, payload: dict, request: Request, db: Session = 
                 avatar_path = os.path.join(avatars_dir, f"user_{user_id}.{ext}")
                 with open(avatar_path, "wb") as f:
                     f.write(img_bytes)
-                user.avatar_url = avatar_data  # store full base64 for easy retrieval
+                
+                # Store the web accessible path/URL instead of heavy base64 string
+                base_url = str(request.base_url).rstrip("/")
+                user.avatar_url = f"{base_url}/uploads/avatars/user_{user_id}.{ext}"
             except Exception:
                 pass  # ignore avatar save failure — don't break the whole request
+        elif not avatar_data:
+            user.avatar_url = None
 
     db.commit()
     db.refresh(user)
 
-    log_activity(db, "profile_update", user_id=user_id,
-                 description="Profile updated", ip_address=get_ip(request))
+    background_tasks.add_task(
+        log_activity_bg, "profile_update", user_id=user_id,
+        description="Profile updated", ip_address=get_ip(request)
+    )
 
     return {"message": "Profile updated", "user": _user_dict(user)}
 
@@ -290,7 +320,7 @@ def clear_quick_history(user_id: int, db: Session = Depends(get_db)):
 
 # ── Upload image ──────────────────────────────────────────────────────────────
 @app.post("/upload-image")
-async def upload_image(request: Request, user_id: int = Form(...),
+async def upload_image(request: Request, background_tasks: BackgroundTasks, user_id: int = Form(...),
                        image: UploadFile = File(...), db: Session = Depends(get_db)):
     user = db.query(User).filter(User.id == user_id).first()
     if not user:
@@ -315,9 +345,11 @@ async def upload_image(request: Request, user_id: int = Form(...),
     db.commit()
     db.refresh(db_image)
 
-    log_activity(db, "upload", user_id=user_id,
-                 description=f"Uploaded: {image.filename}", ip_address=get_ip(request),
-                 metadata={"image_id": db_image.id, "filename": image.filename})
+    background_tasks.add_task(
+        log_activity_bg, "upload", user_id=user_id,
+        description=f"Uploaded: {image.filename}", ip_address=get_ip(request),
+        metadata={"image_id": db_image.id, "filename": image.filename}
+    )
 
     return {"message": "Uploaded", "image_id": db_image.id,
             "filename": db_image.original_filename, "status": db_image.processing_status}
@@ -325,7 +357,7 @@ async def upload_image(request: Request, user_id: int = Form(...),
 
 # ── Save conversion ───────────────────────────────────────────────────────────
 @app.post("/save-conversion")
-def save_conversion(payload: dict, request: Request, db: Session = Depends(get_db)):
+def save_conversion(payload: dict, request: Request, background_tasks: BackgroundTasks, db: Session = Depends(get_db)):
     user_id       = payload.get("user_id")
     image_id      = payload.get("image_id")          # optional — None for text-based tools
     generated_ddl = payload.get("generated_ddl", "")
@@ -361,10 +393,12 @@ def save_conversion(payload: dict, request: Request, db: Session = Depends(get_d
     db.commit()
     db.refresh(conv)
 
-    log_activity(db, "convert", user_id=user_id,
-                 description=f"{tool} → {dialect.upper()} DDL", ip_address=get_ip(request),
-                 metadata={"conversion_id": conv.id, "dialect": dialect,
-                           "tables": tables_count, "tool": tool})
+    background_tasks.add_task(
+        log_activity_bg, "convert", user_id=user_id,
+        description=f"{tool} → {dialect.upper()} DDL", ip_address=get_ip(request),
+        metadata={"conversion_id": conv.id, "dialect": dialect,
+                  "tables": tables_count, "tool": tool}
+    )
 
     api_log = ApiUsage(user_id=user_id, endpoint=f"/api/{tool.replace('_','-')}",
                        model_used="mistral-small-latest",
@@ -377,7 +411,7 @@ def save_conversion(payload: dict, request: Request, db: Session = Depends(get_d
 
 # ── Record a Razorpay payment + upgrade plan atomically ──────────────────────
 @app.post("/payments")
-def record_payment(payload: dict, request: Request, db: Session = Depends(get_db)):
+def record_payment(payload: dict, request: Request, background_tasks: BackgroundTasks, db: Session = Depends(get_db)):
     from models import Payment
     user_id             = payload.get("user_id")
     razorpay_order_id   = payload.get("razorpay_order_id")
@@ -412,12 +446,14 @@ def record_payment(payload: dict, request: Request, db: Session = Depends(get_db
     db.commit()
     db.refresh(payment)
 
-    log_activity(db, "upgrade", user_id=user_id,
-                 description=f"Upgraded to {plan_purchased} via Razorpay",
-                 ip_address=get_ip(request),
-                 metadata={"payment_id": payment.id,
-                           "razorpay_payment_id": razorpay_payment_id,
-                           "amount_paise": amount_paise})
+    background_tasks.add_task(
+        log_activity_bg, "upgrade", user_id=user_id,
+        description=f"Upgraded to {plan_purchased} via Razorpay",
+        ip_address=get_ip(request),
+        metadata={"payment_id": payment.id,
+                  "razorpay_payment_id": razorpay_payment_id,
+                  "amount_paise": amount_paise}
+    )
 
     return {"message": "Payment recorded", "payment_id": payment.id, "user": _user_dict(user)}
 
@@ -498,7 +534,7 @@ def increment_conversions(user_id: int, db: Session = Depends(get_db)):
 
 # ── Log export ────────────────────────────────────────────────────────────────
 @app.post("/log-export")
-def log_export(payload: dict, request: Request, db: Session = Depends(get_db)):
+def log_export(payload: dict, request: Request, background_tasks: BackgroundTasks, db: Session = Depends(get_db)):
     user_id       = payload.get("user_id")
     conversion_id = payload.get("conversion_id")
     fmt           = payload.get("format", "copy")
@@ -507,8 +543,10 @@ def log_export(payload: dict, request: Request, db: Session = Depends(get_db)):
     export = ExportLog(user_id=user_id, conversion_id=conversion_id, format=fmt)
     db.add(export)
     db.commit()
-    log_activity(db, "export", user_id=user_id,
-                 description=f"Exported as {fmt}", ip_address=get_ip(request))
+    background_tasks.add_task(
+        log_activity_bg, "export", user_id=user_id,
+        description=f"Exported as {fmt}", ip_address=get_ip(request)
+    )
     return {"message": "Logged"}
 
 

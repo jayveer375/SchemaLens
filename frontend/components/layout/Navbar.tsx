@@ -1,7 +1,7 @@
 "use client";
 import { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { Sun, Moon, Bell, Search, CheckCircle2, User, Settings, LogOut, ArrowRight } from "lucide-react";
+import { Sun, Moon, Search, CheckCircle2, User, Settings, LogOut, ArrowRight } from "lucide-react";
 import { useStore } from "@/lib/store";
 import { initials, cn } from "@/lib/utils";
 import { getPlan } from "@/lib/subscription";
@@ -40,7 +40,8 @@ export default function Navbar({ onNavigate, page }: NavbarProps) {
         className="app-navbar fixed top-0 right-0 z-20 h-[57px] flex items-center justify-between
           px-6 bg-[var(--card)] border-b border-[var(--border)] transition-[left] duration-[250ms]"
       >
-        {/* Search trigger */}
+        {/* Search trigger — hidden on admin page */}
+        {!isAdminPage && (
         <button
           onClick={() => setSearchOpen(true)}
           className="relative hidden sm:flex items-center gap-2 pl-3 pr-3 py-2 text-sm rounded-xl
@@ -56,17 +57,9 @@ export default function Navbar({ onNavigate, page }: NavbarProps) {
               border-[var(--border)] bg-[var(--card)] text-[10px] font-mono text-[var(--text-subtle)]">K</kbd>
           </span>
         </button>
+        )}
 
         <div className="ml-auto flex items-center gap-2">
-          {/* Notifications */}
-          {!isAdminPage && (
-            <button className="relative w-8 h-8 rounded-xl flex items-center justify-center
-              text-[var(--text-muted)] hover:bg-[var(--surface)] transition-colors">
-              <Bell size={15} />
-              <span className="absolute top-1.5 right-1.5 w-1.5 h-1.5 rounded-full bg-primary-500" />
-            </button>
-          )}
-
           {/* Theme */}
           <motion.button whileTap={{ scale: 0.9 }}
             onClick={() => setTheme(theme === "light" ? "dark" : "light")}

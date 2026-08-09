@@ -88,8 +88,8 @@ export default function ProfilePage({ onNavigate }: { onNavigate: (p: string) =>
 
             {/* Full Name */}
             <div>
-              <label className="flex items-center gap-2 text-sm font-semibold text-[var(--text)] mb-2.5">
-                <User size={15} className="text-[var(--text-muted)]" />
+              <label className="flex items-center gap-2 text-base font-semibold text-[var(--text)] mb-2.5">
+                <User size={17} className="text-[var(--text-muted)]" />
                 Full Name
               </label>
               <input
@@ -102,26 +102,17 @@ export default function ProfilePage({ onNavigate }: { onNavigate: (p: string) =>
 
             {/* Email */}
             <div>
-              <label className="flex items-center gap-2 text-sm font-semibold text-[var(--text)] mb-2.5">
-                <Mail size={15} className="text-[var(--text-muted)]" />
+              <label className="flex items-center gap-2 text-base font-semibold text-[var(--text)] mb-2.5">
+                <Mail size={17} className="text-[var(--text-muted)]" />
                 Email Address
               </label>
               <input className={cn(inp, "opacity-60 cursor-not-allowed")} value={user?.email ?? ""} readOnly />
               <p className="text-sm text-[var(--text-subtle)] mt-2">Email address cannot be changed</p>
             </div>
 
-            {/* Role */}
-            <div>
-              <label className="flex items-center gap-2 text-sm font-semibold text-[var(--text)] mb-2.5">
-                <Shield size={15} className="text-[var(--text-muted)]" />
-                Role
-              </label>
-              <input className={cn(inp, "opacity-60 cursor-not-allowed capitalize")} value={user?.role ?? ""} readOnly />
-            </div>
-
             {/* Info box */}
             <div className="rounded-xl bg-[var(--surface)] border border-[var(--border)] p-4">
-              <p className="text-sm text-[var(--text-muted)] leading-relaxed">
+              <p className="text-base text-[var(--text-muted)] leading-relaxed">
                 Your <span className="font-semibold text-[var(--text)]">display name</span> is shown across projects,
                 exports, and history. Only the name field can be edited here — contact support for any other changes.
               </p>
@@ -199,7 +190,7 @@ export default function ProfilePage({ onNavigate }: { onNavigate: (p: string) =>
 
               <div className="flex items-center gap-2 mt-3 flex-wrap justify-center">
                 <span className={cn(
-                  "badge text-xs font-semibold px-3 py-1",
+                  "badge text-sm font-semibold px-3 py-1",
                   user?.role === "admin"
                     ? "bg-amber-50 dark:bg-amber-500/10 text-amber-600"
                     : "badge-emerald"
@@ -207,7 +198,7 @@ export default function ProfilePage({ onNavigate }: { onNavigate: (p: string) =>
                   {user?.role}
                 </span>
                 <span className={cn(
-                  "badge text-xs font-semibold px-3 py-1",
+                  "badge text-sm font-semibold px-3 py-1",
                   sub.planId === "pro"
                     ? "bg-emerald-50 dark:bg-emerald-500/10 text-emerald-600"
                     : "bg-[var(--surface)] text-[var(--text-muted)]"
@@ -215,13 +206,13 @@ export default function ProfilePage({ onNavigate }: { onNavigate: (p: string) =>
                   {plan.name} Plan
                 </span>
                 {user?.emailVerified && (
-                  <span className="flex items-center gap-1.5 text-xs text-emerald-600 font-semibold">
-                    <CheckCircle2 size={13} /> Verified
+                  <span className="flex items-center gap-1.5 text-sm text-emerald-600 font-semibold">
+                    <CheckCircle2 size={14} /> Verified
                   </span>
                 )}
               </div>
 
-              <p className="text-xs text-[var(--text-subtle)] mt-4 leading-relaxed">
+              <p className="text-sm text-[var(--text-subtle)] mt-4 leading-relaxed">
                 Click the camera icon to update your photo. Saves automatically.
                 <br />PNG, JPG, WEBP · max 2 MB
               </p>
@@ -243,10 +234,10 @@ export default function ProfilePage({ onNavigate }: { onNavigate: (p: string) =>
                 <div key={label}
                   className="flex items-center justify-between py-3.5 border-b border-[var(--border)] last:border-none">
                   <div className="flex items-center gap-2.5">
-                    <Icon size={15} className="text-[var(--text-muted)]" />
-                    <span className="text-sm text-[var(--text-muted)]">{label}</span>
+                    <Icon size={17} className="text-[var(--text-muted)]" />
+                    <span className="text-base text-[var(--text-muted)]">{label}</span>
                   </div>
-                  <span className="text-sm font-semibold text-[var(--text)]">{value}</span>
+                  <span className="text-base font-semibold text-[var(--text)]">{value}</span>
                 </div>
               ))}
             </div>
@@ -291,7 +282,7 @@ export default function ProfilePage({ onNavigate }: { onNavigate: (p: string) =>
             <div className="mt-5 pt-5 border-t border-[var(--border)] flex flex-col gap-2.5">
               <button
                 onClick={() => onNavigate("settings")}
-                className="w-full btn-ghost text-sm py-2.5 justify-center"
+                className="w-full btn-ghost text-base py-2.5 justify-center"
               >
                 Change Password
               </button>

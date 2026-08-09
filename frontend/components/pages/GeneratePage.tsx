@@ -158,9 +158,34 @@ export default function GeneratePage({ onNavigate }: { onNavigate: (p: string) =
   // ── Sanitize Mermaid syntax before rendering ──────────────────────────────
   function sanitizeMermaid(raw: string): string {
     let s = raw.trim();
+    const lower = s.toLowerCase();
+
+    // ── DFD (Level 0 / Level 1) — convert to flowchart ───────────────────
+    // Mermaid has no native DFD support; AI often generates custom syntax.
+    // We normalise it into a valid flowchart LR.
+    if (lower.startsWith("dfd") || lower.startsWith("graph dfd") || lower.includes("dataflow")) {
+      // Strip any non-flowchart header line
+      const lines = s.split("\n").filter(l => l.trim());
+      const bodyLines = lines.filter(l =>
+        !l.trim().toLowerCase().startsWith("dfd") &&
+        !l.trim().toLowerCase().startsWith("dataflow")
+      );
+      // Normalise arrows
+      let body = bodyLines.join("\n")
+        .replace(/—>/g, "-->").replace(/→/g, "-->").replace(/=>/g, "-->")
+        .replace(/\[([^\]]*):([^\]]*)\]/g, (_, a, b) => `[${a.trim()} ${b.trim()}]`)
+        .replace(/\(([^)]*):([^)]*)\)/g, (_, a, b) => `(${a.trim()} ${b.trim()})`);
+      return `flowchart LR\n${body}`;
+    }
+
+    // ── Class diagram fixes ───────────────────────────────────────────────
+    if (lower.startsWith("classdiagram") || lower.startsWith("class diagram")) {
+      s = s.replace(/^class\s*diagram/im, "classDiagram");
+      return s.split("\n").filter(l => l.trim()).join("\n");
+    }
 
     // ── Flowchart-specific fixes ───────────────────────────────────────────
-    if (!s.toLowerCase().startsWith("erdiagram")) {
+    if (!lower.startsWith("erdiagram")) {
       s = s.replace(/^Flowchart\s/im, "flowchart ");
       s = s.replace(/—>/g, "-->").replace(/→/g, "-->").replace(/=>/g, "-->");
       s = s.replace(/-->\s*\|/g, "-->|");
@@ -260,7 +285,8 @@ export default function GeneratePage({ onNavigate }: { onNavigate: (p: string) =
         startOnLoad: false,
         theme: theme === "dark" ? "dark" : "default",
         er: { diagramPadding: 20, layoutDirection: "TB", minEntityWidth: 100 },
-        flowchart: { curve: "basis", padding: 20 },
+        flowchart: { curve: "basis", padding: 20, htmlLabels: true },
+        classDiagram: { diagramPadding: 20 },
         securityLevel: "loose",
       });
       const id = `mermaid-${genId()}`;

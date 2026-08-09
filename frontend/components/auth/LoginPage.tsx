@@ -22,7 +22,7 @@ export default function LoginPage({ onNavigate }: { onNavigate: (page: string) =
     setLoading(true);
     try {
       seedSuperAdmin();
-      const { user, token } = await loginUser(email, password);
+      const { user, token, projects: prefetchedProjects, quickHistory: prefetchedQH } = await loginUser(email, password);
       setUser(user);
       setToken(token);
 
@@ -30,12 +30,21 @@ export default function LoginPage({ onNavigate }: { onNavigate: (page: string) =
       const numericId = parseInt(user.id, 10);
       if (!isNaN(numericId)) {
         try {
-          const [projects, qHistory] = await Promise.all([
-            apiGetProjects(numericId),
-            apiGetQuickHistory(numericId),
-          ]);
+          let projects = prefetchedProjects;
+          let qHistory = prefetchedQH;
+
+          // Fallback: If not already returned by login response, fetch them in parallel
+          if (!projects || !qHistory) {
+            const [fetchedProjects, fetchedQH] = await Promise.all([
+              projects ? Promise.resolve(projects) : apiGetProjects(numericId),
+              qHistory ? Promise.resolve(qHistory) : apiGetQuickHistory(numericId),
+            ]);
+            projects = projects || (fetchedProjects as any);
+            qHistory = qHistory || (fetchedQH as any);
+          }
+
           // Map backend projects → frontend Project shape
-          const mapped: Project[] = projects.map((p) => ({
+          const mapped: Project[] = (projects || []).map((p: any) => ({
             id: p.id,
             ownerId: user.id,
             name: p.name,
@@ -47,7 +56,7 @@ export default function LoginPage({ onNavigate }: { onNavigate: (page: string) =
             pinned: p.pinned,
           }));
           // Map quick history
-          const mappedQH: QuickConvertResult[] = qHistory.map((e) => ({
+          const mappedQH: QuickConvertResult[] = (qHistory || []).map((e: any) => ({
             id: e.id,
             filename: e.filename,
             sql: e.sql,

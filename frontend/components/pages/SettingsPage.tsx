@@ -62,8 +62,8 @@ export default function SettingsPage({ onNavigate }: { onNavigate: (p: string) =
   const Row = ({ label, desc, children }: { label: string; desc?: string; children: React.ReactNode }) => (
     <div className="flex items-center justify-between py-4 border-b border-[var(--border)] last:border-none">
       <div className="flex-1 min-w-0 mr-4">
-        <p className="text-sm font-medium text-[var(--text)]">{label}</p>
-        {desc && <p className="text-xs text-[var(--text-muted)] mt-0.5">{desc}</p>}
+        <p className="text-base font-medium text-[var(--text)]">{label}</p>
+        {desc && <p className="text-sm text-[var(--text-muted)] mt-0.5">{desc}</p>}
       </div>
       {children}
     </div>
@@ -72,8 +72,8 @@ export default function SettingsPage({ onNavigate }: { onNavigate: (p: string) =
   return (
     <div>
       <div className="mb-6">
-        <h1 className="text-2xl font-bold text-[var(--text)]">Settings</h1>
-        <p className="text-sm text-[var(--text-muted)] mt-1">Manage your account preferences</p>
+        <h1 className="text-3xl font-bold text-[var(--text)]">Settings</h1>
+        <p className="text-base text-[var(--text-muted)] mt-1">Manage your account preferences</p>
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-[220px_1fr] gap-6">
@@ -84,7 +84,7 @@ export default function SettingsPage({ onNavigate }: { onNavigate: (p: string) =
               key={id}
               onClick={() => setTab(id)}
               className={cn(
-                "w-full flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-sm font-medium transition-all",
+                "w-full flex items-center gap-3 px-3.5 py-3 rounded-xl text-base font-medium transition-all",
                 tab === id
                   ? danger
                     ? "bg-red-50 dark:bg-red-500/10 text-red-600"
@@ -95,7 +95,7 @@ export default function SettingsPage({ onNavigate }: { onNavigate: (p: string) =
               )}
               style={tab === id && !danger ? { background: "var(--primary)" } : undefined}
             >
-              <Icon size={15} />{label}
+              <Icon size={17} />{label}
             </button>
           ))}
         </div>
@@ -125,7 +125,7 @@ export default function SettingsPage({ onNavigate }: { onNavigate: (p: string) =
                       { label: "Confirm New Password",  key: "confirm", val: pw.confirm },
                     ].map(({ label, key, val }) => (
                       <div key={key}>
-                        <label className="block text-sm font-medium text-[var(--text)] mb-1.5">{label}</label>
+                    <label className="block text-base font-medium text-[var(--text)] mb-1.5">{label}</label>
                         <div className="relative">
                           <input
                             type={showPw ? "text" : "password"}
@@ -146,7 +146,7 @@ export default function SettingsPage({ onNavigate }: { onNavigate: (p: string) =
                         </div>
                       </div>
                     ))}
-                    <button onClick={savePassword} disabled={saving} className="btn-primary text-sm disabled:opacity-60">
+                    <button onClick={savePassword} disabled={saving} className="btn-primary text-base disabled:opacity-60">
                       {saving ? "Saving…" : "Update Password"}
                     </button>
                   </div>
@@ -164,7 +164,7 @@ export default function SettingsPage({ onNavigate }: { onNavigate: (p: string) =
                           key={t}
                           onClick={() => setTheme(t)}
                           className={cn(
-                            "px-4 py-2 rounded-xl text-sm font-medium border transition-all",
+                            "px-4 py-2.5 rounded-xl text-base font-medium border transition-all",
                             theme === t ? "bg-primary-600 text-white border-primary-600" : "btn-ghost"
                           )}
                         >

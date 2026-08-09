@@ -129,7 +129,7 @@ export async function registerUser(
 export async function loginUser(
   email: string,
   password: string
-): Promise<{ user: User; token: string }> {
+): Promise<{ user: User; token: string; projects?: any[]; quickHistory?: any[] }> {
   const trimEmail = email.trim().toLowerCase();
 
   // Super Admin still uses localStorage (not in PostgreSQL)
@@ -146,11 +146,16 @@ export async function loginUser(
   }
 
   // All other users → FastAPI backend → checks bcrypt hash, updates last_login
-  const result = await apiLogin({ email: trimEmail, password });
+  const result = await apiLogin({ email: trimEmail, password }) as any;
   const user   = backendToFrontendUser(result.user);
   user.lastLogin = Date.now();
   const token  = buildToken(user);
-  return { user, token };
+  return {
+    user,
+    token,
+    projects: result.projects,
+    quickHistory: result.quick_history,
+  };
 }
 
 // ── Google login (mock — unchanged) ──────────────────────────────────────────

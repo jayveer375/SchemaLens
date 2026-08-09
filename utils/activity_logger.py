@@ -1,14 +1,12 @@
 """
 utils/activity_logger.py
 ─────────────────────────
-Helper to log user activity to the user_activity table.
-Import and call log_activity() from any route handler.
+Activity logging is disabled — all functions are no-ops.
+This prevents unnecessary writes to the user_activity table.
 """
 
 from sqlalchemy.orm import Session
-from models import UserActivity
 from typing import Optional
-import datetime
 
 
 def log_activity(
@@ -20,21 +18,23 @@ def log_activity(
     user_agent: Optional[str] = None,
     metadata: Optional[dict] = None,
 ) -> None:
-    """
-    Insert one row into user_activity.
+    pass  # logging disabled
 
-    Example usage:
-        log_activity(db, "login", user_id=1, description="Login successful", ip_address="192.168.1.1")
-        log_activity(db, "upload", user_id=1, description="Uploaded er_diagram.png", metadata={"filename": "er_diagram.png", "size_bytes": 245000})
-    """
-    entry = UserActivity(
-        user_id=user_id,
-        activity_type=activity_type,
-        description=description,
-        ip_address=ip_address,
-        user_agent=user_agent,
-        timestamp=datetime.datetime.utcnow(),
-        metadata_json=metadata,
-    )
-    db.add(entry)
-    db.commit()
+
+def log_activity_bg(
+    activity_type: str,
+    user_id: Optional[int] = None,
+    description: Optional[str] = None,
+    ip_address: Optional[str] = None,
+    user_agent: Optional[str] = None,
+    metadata: Optional[dict] = None,
+) -> None:
+    pass  # logging disabled
+
+
+def log_login_success_bg(
+    user_id: int,
+    ip_address: Optional[str] = None,
+    user_agent: Optional[str] = None,
+) -> None:
+    pass  # logging disabled

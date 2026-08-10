@@ -314,8 +314,25 @@ body {
 /* Primary light var — already set in :root / .dark blocks above */
 
 /* Scrollable tabs */
-.scroll-x { overflow-x: auto; scrollbar-width: none; }
-.scroll-x::-webkit-scrollbar { display: none; }
+.scroll-x { 
+  overflow-x: auto; 
+  scrollbar-width: thin; 
+  scroll-behavior: smooth;
+  -webkit-overflow-scrolling: touch;
+}
+.scroll-x::-webkit-scrollbar { 
+  height: 4px; 
+}
+.scroll-x::-webkit-scrollbar-track {
+  background: transparent;
+}
+.scroll-x::-webkit-scrollbar-thumb {
+  background: var(--border);
+  border-radius: 2px;
+}
+.scroll-x::-webkit-scrollbar-thumb:hover {
+  background: var(--text-muted);
+}
 
 /* Full height main */
 .main-content { min-height: calc(100vh - 57px); }

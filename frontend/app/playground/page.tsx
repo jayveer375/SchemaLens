@@ -301,6 +301,7 @@ export default function PlaygroundPage() {
   const diagramBtnRef = useRef<HTMLButtonElement>(null);
   const editorRef = useRef<unknown>(null);
   const monacoRef = useRef<unknown>(null);
+  const toolbarRef = useRef<HTMLDivElement>(null);
   
   // AI SQL Generator state
   const [aiPanelOpen, setAiPanelOpen] = useState(false);
@@ -411,6 +412,52 @@ export default function PlaygroundPage() {
     const monaco = monacoRef.current as any;
     if (monaco?.editor) monaco.editor.setTheme(monacoTheme);
   }, [monacoTheme]);
+
+  // ── Preserve toolbar scroll position during sidebar transitions ─────────────────────────────────────────
+  useEffect(() => {
+    let scrollPosition = 0;
+    const toolbar = toolbarRef.current;
+    
+    const preserveScroll = () => {
+      if (toolbar) {
+        scrollPosition = toolbar.scrollLeft;
+      }
+    };
+
+    const restoreScroll = () => {
+      if (toolbar) {
+        toolbar.scrollLeft = scrollPosition;
+      }
+    };
+
+    // Listen for layout transition start/end
+    const observer = new MutationObserver(() => {
+      preserveScroll();
+      requestAnimationFrame(restoreScroll);
+    });
+
+    // Watch for changes that might affect layout
+    if (toolbar) {
+      observer.observe(document.body, {
+        attributes: true,
+        attributeFilter: ['style', 'class'],
+        subtree: true
+      });
+    }
+
+    // Also handle resize events
+    const handleResize = () => {
+      preserveScroll();
+      requestAnimationFrame(restoreScroll);
+    };
+
+    window.addEventListener('resize', handleResize);
+
+    return () => {
+      observer.disconnect();
+      window.removeEventListener('resize', handleResize);
+    };
+  }, []);
 
   // ── Load initial SQL from store (when coming from Quick Convert) ─────────────
   useEffect(() => {
@@ -639,19 +686,32 @@ export default function PlaygroundPage() {
         height: "calc(100vh - 57px)",
         background: "var(--surface)",
         overflow: "hidden",
+        position: "relative",
+        minWidth: "320px", // Minimum width to prevent extreme compression
       }}
     >
       {/* ── Header ─────────────────────────────────────────────────────────── */}
       <motion.div
+        ref={toolbarRef}
         initial={{ opacity: 0, y: -8 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.25 }}
-        className="flex items-center gap-3 px-3 sm:px-5 py-3 flex-shrink-0
-          border-b border-[var(--border)] bg-[var(--card)] overflow-x-auto"
-        style={{ scrollbarWidth: "none" }}
+        className="flex items-center gap-2 px-3 sm:px-5 py-3 flex-shrink-0 scroll-x
+          border-b border-[var(--border)] bg-[var(--card)]"
+        style={{
+          overflowX: "auto",
+          scrollbarWidth: "thin",
+          scrollbarColor: "var(--border) transparent",
+          minHeight: "65px", // Ensure consistent height
+          WebkitOverflowScrolling: "touch", // Better mobile scrolling
+          position: "sticky", // Stick to top during transitions
+          top: 0,
+          zIndex: 10,
+          willChange: "scroll-position", // Optimize scroll performance
+        }}
       >
-        {/* Title — never shrinks */}
-        <div className="flex items-center gap-2.5 flex-shrink-0">
+        {/* Title */}
+        <div className="flex items-center gap-2.5 shrink-0 mr-3">
           <div
             className="w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0"
             style={{ background: "var(--primary-light)", color: "var(--primary)" }}
@@ -669,16 +729,19 @@ export default function PlaygroundPage() {
           </div>
         </div>
 
-        {/* Spacer */}
-        <div className="flex-1" style={{ minWidth: 16 }} />
-
-        {/* Action buttons — all in one row, never wrap, never hide */}
-        <div className="flex items-center gap-2 flex-shrink-0">
+        {/* Action buttons — all inline, scroll if needed */}
+        <div 
+          className="flex items-center gap-2"
+          style={{
+            minWidth: "fit-content", // Ensures buttons don't shrink below their natural width
+            flexShrink: 0, // Prevents shrinking when container is small
+          }}
+        >
           <motion.button
             whileHover={{ scale: 1.02 }}
             whileTap={{ scale: 0.96 }}
             onClick={runSQL}
-            className="btn-primary btn-sm gap-1.5"
+            className="btn-primary btn-sm gap-1.5 whitespace-nowrap flex-shrink-0"
             title="Run SQL (Ctrl+Enter)"
           >
             <Play size={13} />
@@ -689,7 +752,7 @@ export default function PlaygroundPage() {
             whileHover={{ scale: 1.02 }}
             whileTap={{ scale: 0.96 }}
             onClick={formatSQL}
-            className="btn-ghost btn-sm gap-1.5"
+            className="btn-ghost btn-sm gap-1.5 whitespace-nowrap flex-shrink-0"
             title="Format SQL"
           >
             <Wand2 size={13} />
@@ -700,7 +763,7 @@ export default function PlaygroundPage() {
             whileHover={{ scale: 1.02 }}
             whileTap={{ scale: 0.96 }}
             onClick={() => setAiPanelOpen(!aiPanelOpen)}
-            className={cn("btn-ghost btn-sm gap-1.5", aiPanelOpen && "bg-[var(--surface)]")}
+            className={cn("btn-ghost btn-sm gap-1.5 whitespace-nowrap flex-shrink-0", aiPanelOpen && "bg-[var(--surface)]")}
             title="AI SQL Generator"
           >
             <Sparkles size={13} />
@@ -708,7 +771,7 @@ export default function PlaygroundPage() {
           </motion.button>
 
           {/* Diagram Dropdown Button */}
-          <div className="relative">
+          <div className="relative flex-shrink-0">
             <motion.button
               ref={diagramBtnRef}
               whileHover={{ scale: 1.02 }}
@@ -723,7 +786,7 @@ export default function PlaygroundPage() {
                 }
                 setDiagramDropdownOpen((v) => !v);
               }}
-              className={cn("btn-ghost btn-sm gap-1.5", diagramDropdownOpen && "bg-[var(--surface)]")}
+              className={cn("btn-ghost btn-sm gap-1.5 whitespace-nowrap", diagramDropdownOpen && "bg-[var(--surface)]")}
               title="Generate Diagram"
             >
               <GitFork size={13} />
@@ -792,7 +855,7 @@ export default function PlaygroundPage() {
             whileHover={{ scale: 1.02 }}
             whileTap={{ scale: 0.96 }}
             onClick={copySQL}
-            className="btn-ghost btn-sm gap-1.5"
+            className="btn-ghost btn-sm gap-1.5 whitespace-nowrap flex-shrink-0"
             title="Copy SQL"
           >
             <AnimatePresence mode="wait" initial={false}>
@@ -828,7 +891,7 @@ export default function PlaygroundPage() {
             whileHover={{ scale: 1.02 }}
             whileTap={{ scale: 0.96 }}
             onClick={downloadSQL}
-            className="btn-ghost btn-sm gap-1.5"
+            className="btn-ghost btn-sm gap-1.5 whitespace-nowrap flex-shrink-0"
             title="Download schema.sql (Ctrl+S)"
           >
             <Download size={13} />
@@ -841,7 +904,7 @@ export default function PlaygroundPage() {
             whileHover={{ scale: 1.02 }}
             whileTap={{ scale: 0.96 }}
             onClick={() => { setHistoryOpen(!historyOpen); setTablesOpen(false); }}
-            className={cn("btn-ghost btn-sm gap-1.5", historyOpen && "bg-[var(--surface)")}
+            className={cn("btn-ghost btn-sm gap-1.5 whitespace-nowrap flex-shrink-0", historyOpen && "bg-[var(--surface)]")}
             title="Toggle history panel"
           >
             <History size={13} />
@@ -857,7 +920,7 @@ export default function PlaygroundPage() {
             whileHover={{ scale: 1.02 }}
             whileTap={{ scale: 0.96 }}
             onClick={() => { setTablesOpen(!tablesOpen); setHistoryOpen(false); }}
-            className={cn("btn-ghost btn-sm gap-1.5", tablesOpen && "bg-[var(--surface)")}
+            className={cn("btn-ghost btn-sm gap-1.5 whitespace-nowrap flex-shrink-0", tablesOpen && "bg-[var(--surface)]")}
             title="Toggle table explorer"
           >
             <Table size={13} />

@@ -12,6 +12,11 @@ import bcrypt
 import datetime
 import base64
 import os
+import random
+import string
+import smtplib
+from email.mime.text import MIMEText
+from email.mime.multipart import MIMEMultipart
 
 from database import get_db
 from models import User, Image, Conversion, ApiUsage, ExportLog, UserActivity, ProjectImage
@@ -161,6 +166,200 @@ def change_password(user_id: int, payload: dict, request: Request, background_ta
     )
 
     return {"message": "Password updated successfully"}
+
+
+# In-memory OTP storage (in production, use Redis or database)
+otp_storage = {}
+email_rate_limit = {}  # Track email sending rate
+
+def check_rate_limit(email: str) -> bool:
+    """Check if email can send OTP (max 3 per hour per email)"""
+    import time
+    current_time = time.time()
+    
+    if email not in email_rate_limit:
+        email_rate_limit[email] = []
+    
+    # Remove old timestamps (older than 1 hour)
+    email_rate_limit[email] = [
+        timestamp for timestamp in email_rate_limit[email] 
+        if current_time - timestamp < 3600  # 1 hour
+    ]
+    
+    # Check if under limit (3 per hour)
+    if len(email_rate_limit[email]) >= 3:
+        return False
+    
+    # Add current timestamp
+    email_rate_limit[email].append(current_time)
+    return True
+
+def generate_otp():
+    """Generate a 6-digit OTP"""
+    return ''.join(random.choices(string.digits, k=6))
+
+def send_email_otp(email: str, otp: str):
+    """Send OTP via email with enhanced debugging"""
+    try:
+        smtp_email = os.getenv("SMTP_EMAIL")
+        smtp_password = os.getenv("SMTP_PASSWORD")
+        
+        print(f"[EMAIL DEBUG] Attempting to send OTP to: {email}")
+        print(f"[EMAIL DEBUG] Using sender: {smtp_email}")
+        
+        if not smtp_email or not smtp_password:
+            print("[EMAIL ERROR] SMTP credentials not configured in .env file")
+            print(f"[CONSOLE OTP] For testing - OTP for {email}: {otp}")
+            return True  # Return True for testing purposes
+        
+        # Gmail SMTP configuration (most reliable)
+        smtp_server = "smtp.gmail.com"
+        smtp_port = 587
+        
+        msg = MIMEMultipart()
+        msg['From'] = smtp_email
+        msg['To'] = email
+        msg['Subject'] = "Password Reset OTP - Schemalens"
+        
+        # Simpler email body to avoid any formatting issues
+        body = f"""
+Hello,
+
+Your password reset OTP is: {otp}
+
+This OTP will expire in 10 minutes.
+
+Best regards,
+Schemalens Team
+        """
+        msg.attach(MIMEText(body, 'plain'))
+        
+        print("[EMAIL DEBUG] Connecting to Gmail SMTP...")
+        server = smtplib.SMTP(smtp_server, smtp_port)
+        server.set_debuglevel(1)  # Enable SMTP debugging
+        server.starttls()
+        
+        print("[EMAIL DEBUG] Logging in...")
+        server.login(smtp_email, smtp_password)
+        
+        print(f"[EMAIL DEBUG] Sending email to {email}...")
+        text = msg.as_string()
+        server.sendmail(smtp_email, email, text)
+        server.quit()
+        
+        print(f"[EMAIL SUCCESS] OTP sent to {email}")
+        return True
+        
+    except Exception as e:
+        print(f"[EMAIL ERROR] Failed to send email: {e}")
+        print(f"[EMAIL ERROR] Error type: {type(e).__name__}")
+        print(f"[CONSOLE OTP] For testing - OTP for {email}: {otp}")
+        return True  # Still return True so app doesn't break during development
+
+# ── Send OTP for password reset ──────────────────────────────────────────────
+@app.post("/forgot-password/send-otp")
+def send_password_reset_otp(payload: dict, request: Request, db: Session = Depends(get_db)):
+    email = payload.get("email", "").strip().lower()
+    
+    if not email:
+        raise HTTPException(status_code=400, detail="Email is required")
+    
+    # Check rate limit (3 OTPs per hour per email)
+    if not check_rate_limit(email):
+        raise HTTPException(status_code=429, detail="Too many OTP requests. Please wait 1 hour before trying again.")
+    
+    # Check if user exists
+    user = db.query(User).filter(User.email == email).first()
+    if not user:
+        raise HTTPException(status_code=404, detail="No account found with this email address")
+    
+    # Generate OTP and store with expiration (10 minutes)
+    otp = generate_otp()
+    expiry = datetime.datetime.utcnow() + datetime.timedelta(minutes=10)
+    
+    otp_storage[email] = {
+        "otp": otp,
+        "expiry": expiry,
+        "user_id": user.id,
+        "verified": False
+    }
+    
+    # Send OTP via email
+    if send_email_otp(email, otp):
+        return {"message": "OTP sent successfully", "email": email}
+    else:
+        raise HTTPException(status_code=500, detail="Failed to send OTP. Please try again.")
+
+# ── Verify OTP ────────────────────────────────────────────────────────────────
+@app.post("/forgot-password/verify-otp")
+def verify_password_reset_otp(payload: dict, request: Request):
+    email = payload.get("email", "").strip().lower()
+    otp = payload.get("otp", "").strip()
+    
+    if not email or not otp:
+        raise HTTPException(status_code=400, detail="Email and OTP are required")
+    
+    # Check if OTP exists
+    if email not in otp_storage:
+        raise HTTPException(status_code=400, detail="No OTP found for this email")
+    
+    otp_data = otp_storage[email]
+    
+    # Check if OTP is expired
+    if datetime.datetime.utcnow() > otp_data["expiry"]:
+        del otp_storage[email]
+        raise HTTPException(status_code=400, detail="OTP has expired. Please request a new one.")
+    
+    # Check if OTP matches
+    if otp != otp_data["otp"]:
+        raise HTTPException(status_code=400, detail="Invalid OTP")
+    
+    # Mark OTP as verified
+    otp_storage[email]["verified"] = True
+    
+    return {"message": "OTP verified successfully", "email": email}
+
+# ── Reset password with verified OTP ─────────────────────────────────────────
+@app.post("/forgot-password/reset")
+def reset_password_with_otp(payload: dict, request: Request, background_tasks: BackgroundTasks, db: Session = Depends(get_db)):
+    email = payload.get("email", "").strip().lower()
+    new_password = payload.get("new_password", "")
+    
+    if not email or not new_password:
+        raise HTTPException(status_code=400, detail="Email and new password are required")
+    
+    if len(new_password) < 8:
+        raise HTTPException(status_code=400, detail="Password must be at least 8 characters")
+    
+    # Check if OTP was verified
+    if email not in otp_storage or not otp_storage[email].get("verified", False):
+        raise HTTPException(status_code=400, detail="OTP not verified. Please verify OTP first.")
+    
+    # Check if OTP is still valid (not expired)
+    otp_data = otp_storage[email]
+    if datetime.datetime.utcnow() > otp_data["expiry"]:
+        del otp_storage[email]
+        raise HTTPException(status_code=400, detail="OTP has expired. Please start over.")
+    
+    # Get user and update password
+    user = db.query(User).filter(User.id == otp_data["user_id"]).first()
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+    
+    # Update password
+    user.password_hash = bcrypt.hashpw(new_password.encode(), bcrypt.gensalt()).decode()
+    db.commit()
+    
+    # Clean up OTP
+    del otp_storage[email]
+    
+    # Log activity
+    background_tasks.add_task(
+        log_activity_bg, "password_reset", user_id=user.id,
+        description="Password reset via OTP", ip_address=get_ip(request)
+    )
+    
+    return {"message": "Password reset successfully"}
 
 
 

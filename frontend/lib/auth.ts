@@ -183,6 +183,51 @@ export async function forgotPassword(email: string): Promise<void> {
   // In production: call backend to send reset email
 }
 
+// ── Send OTP for password reset ───────────────────────────────────────────────
+export async function sendPasswordResetOTP(email: string): Promise<void> {
+  const API = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
+  const res = await fetch(`${API}/forgot-password/send-otp`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ email }),
+  });
+  
+  if (!res.ok) {
+    const data = await res.json().catch(() => ({}));
+    throw new Error(data.detail || "Failed to send OTP");
+  }
+}
+
+// ── Verify OTP ────────────────────────────────────────────────────────────────
+export async function verifyPasswordResetOTP(email: string, otp: string): Promise<void> {
+  const API = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
+  const res = await fetch(`${API}/forgot-password/verify-otp`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ email, otp }),
+  });
+  
+  if (!res.ok) {
+    const data = await res.json().catch(() => ({}));
+    throw new Error(data.detail || "Failed to verify OTP");
+  }
+}
+
+// ── Reset password with OTP ───────────────────────────────────────────────────
+export async function resetPasswordWithOTP(email: string, newPassword: string): Promise<void> {
+  const API = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
+  const res = await fetch(`${API}/forgot-password/reset`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ email, new_password: newPassword }),
+  });
+  
+  if (!res.ok) {
+    const data = await res.json().catch(() => ({}));
+    throw new Error(data.detail || "Failed to reset password");
+  }
+}
+
 // ── Update profile — calls backend, works for DB users ───────────────────────
 export async function updateProfile(
   userId: string,

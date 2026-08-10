@@ -121,22 +121,6 @@ export default function LoginPage({ onNavigate }: { onNavigate: (page: string) =
         </div>
       )}
 
-      {/* Google */}
-      <button onClick={handleGoogle} disabled={loading}
-        className="w-full flex items-center justify-center gap-3 py-3.5 rounded-2xl text-base font-medium
-          border-2 border-[var(--border)] bg-[var(--card)] text-[var(--text)]
-          hover:bg-[var(--surface)] hover:border-primary-400 transition-all disabled:opacity-60 mb-6">
-        <Chrome size={18} className="text-blue-500" />
-        Continue with Google
-      </button>
-
-      {/* Divider */}
-      <div className="flex items-center gap-4 mb-6">
-        <div className="flex-1 h-px bg-[var(--border)]" />
-        <span className="text-sm text-[var(--text-subtle)] whitespace-nowrap">or continue with email</span>
-        <div className="flex-1 h-px bg-[var(--border)]" />
-      </div>
-
       <form onSubmit={handle} className="space-y-5">
         {/* Email */}
         <div>
@@ -153,13 +137,7 @@ export default function LoginPage({ onNavigate }: { onNavigate: (page: string) =
 
         {/* Password */}
         <div>
-          <div className="flex items-center justify-between mb-2">
-            <label className="text-sm font-semibold text-[var(--text)]">Password</label>
-            <button type="button" onClick={() => onNavigate("forgot")}
-              className="text-sm text-primary-600 hover:underline font-medium">
-              Forgot password?
-            </button>
-          </div>
+          <label className="block text-sm font-semibold text-[var(--text)] mb-2">Password</label>
           <div className="relative">
             <Lock size={17} className="absolute left-4 top-1/2 -translate-y-1/2 text-[var(--text-subtle)]" />
             <input
@@ -171,6 +149,13 @@ export default function LoginPage({ onNavigate }: { onNavigate: (page: string) =
             <button type="button" onClick={() => setShow(!show)}
               className="absolute right-4 top-1/2 -translate-y-1/2 text-[var(--text-subtle)] hover:text-[var(--text)] transition-colors">
               {show ? <EyeOff size={17} /> : <Eye size={17} />}
+            </button>
+          </div>
+          {/* Forgot Password - moved below password input */}
+          <div className="text-right mt-2">
+            <button type="button" onClick={() => onNavigate("forgot")}
+              className="text-sm text-primary-600 hover:underline font-medium">
+              Forgot password?
             </button>
           </div>
         </div>
@@ -190,6 +175,22 @@ export default function LoginPage({ onNavigate }: { onNavigate: (page: string) =
           ) : "Sign in"}
         </motion.button>
       </form>
+
+      {/* Divider */}
+      <div className="flex items-center gap-4 my-6">
+        <div className="flex-1 h-px bg-[var(--border)]" />
+        <span className="text-sm text-[var(--text-subtle)] whitespace-nowrap">or</span>
+        <div className="flex-1 h-px bg-[var(--border)]" />
+      </div>
+
+      {/* Google - moved below Sign in button */}
+      <button onClick={handleGoogle} disabled={loading}
+        className="w-full flex items-center justify-center gap-3 py-3.5 rounded-2xl text-base font-medium
+          border-2 border-[var(--border)] bg-[var(--card)] text-[var(--text)]
+          hover:bg-[var(--surface)] hover:border-primary-400 transition-all disabled:opacity-60 mb-6">
+        <Chrome size={18} className="text-blue-500" />
+        Continue with Google
+      </button>
 
       <p className="text-center text-base text-[var(--text-muted)] mt-8">
         Don't have an account?{" "}

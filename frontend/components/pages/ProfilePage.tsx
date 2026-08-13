@@ -250,31 +250,29 @@ export default function ProfilePage({ onNavigate }: { onNavigate: (p: string) =>
               </div>
               <div className="flex items-center justify-between mb-2">
                 <span className="text-2xl font-bold text-[var(--text)]">
-                  {isPro ? "Unlimited" : aiCreditsLeft}
+                  {aiCreditsLeft}
                 </span>
-                {!isPro && (
-                  <span className="text-xs text-[var(--text-subtle)]">/ 70 per month</span>
-                )}
+                <span className="text-xs text-[var(--text-subtle)]">
+                  / {isPro ? 150 : 50} per month
+                </span>
               </div>
-              {!isPro && (
-                <div className="h-2 bg-[var(--surface)] rounded-full overflow-hidden">
-                  <div 
-                    className="h-full bg-[var(--primary)] transition-all duration-300"
-                    style={{ width: `${(aiCreditsLeft / 70) * 100}%` }}
-                  />
-                </div>
-              )}
-              {!isPro && aiCreditsLeft <= 10 && aiCreditsLeft > 0 && (
+              <div className="h-2 bg-[var(--surface)] rounded-full overflow-hidden">
+                <div 
+                  className="h-full bg-[var(--primary)] transition-all duration-300"
+                  style={{ width: `${Math.min(100, (aiCreditsLeft / (isPro ? 150 : 50)) * 100)}%` }}
+                />
+              </div>
+              {aiCreditsLeft <= 15 && aiCreditsLeft > 0 && (
                 <p className="text-xs text-amber-500 mt-2 font-medium">
-                  Low credits remaining. Consider upgrading to Pro.
+                  Low credits remaining (Small question: 5 credits, Big question: 7 credits).
                 </p>
               )}
-              {!isPro && aiCreditsLeft === 0 && (
+              {aiCreditsLeft === 0 && !isPro && (
                 <button
                   onClick={() => onNavigate("pricing")}
                   className="mt-2 w-full btn-primary text-xs py-2"
                 >
-                  Upgrade to Pro for Unlimited
+                  Upgrade to Pro for 150 Credits
                 </button>
               )}
             </div>

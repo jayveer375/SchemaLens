@@ -33,7 +33,7 @@ import {
 import { cn, downloadText } from "@/lib/utils";
 import { parseSQLSchema } from "@/lib/sqlParser";
 import { useStore } from "@/lib/store";
-import { canUsePlayground, canGenerateAI, aiGenerationsLeft } from "@/lib/subscription";
+import { canUsePlayground, canGenerateAI, aiGenerationsLeft, getQuestionCreditCost } from "@/lib/subscription";
 import toast from "react-hot-toast";
 import ERDiagramModal from "@/components/ERDiagramModal";
 import type { DiagramType } from "@/components/ERDiagramModal";
@@ -639,10 +639,9 @@ export default function PlaygroundPage() {
       return;
     }
 
-    // Check credits
-    if (!canUseAI) {
-      toast.error("You've used all your AI generation credits. Upgrade to Pro for unlimited access!");
-      // Trigger upgrade dialog
+    const cost = getQuestionCreditCost(aiPrompt, "generate");
+    if (creditsLeft < cost) {
+      toast.error(`Insufficient AI credits. Required: ${cost} credits, available: ${creditsLeft} credits.`);
       window.dispatchEvent(new CustomEvent("navigate", { detail: "pricing" }));
       return;
     }
@@ -671,10 +670,10 @@ export default function PlaygroundPage() {
       const data = await res.json();
       setAiGeneratedSQL(data.sql || "");
       
-      // Increment AI generation credits
-      incrementAIGenerations();
+      // Increment AI generation credits with cost
+      incrementAIGenerations(cost);
       
-      toast.success("SQL generated successfully!");
+      toast.success(`SQL generated successfully! (-${cost} AI credits)`);
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : "Failed to generate SQL";
       setAiError(errorMessage);
@@ -988,16 +987,9 @@ export default function PlaygroundPage() {
                   <Sparkles size={14} className="text-[var(--primary)]" />
                   <span className="text-xs font-bold text-[var(--text)]">AI SQL Query Generator</span>
                   <div className="ml-auto flex items-center gap-1.5">
-                    {!isPro && (
-                      <span className="text-[10px] text-[var(--text-subtle)]">
-                        {creditsLeft} credits left
-                      </span>
-                    )}
-                    {isPro && (
-                      <span className="text-[10px] text-[var(--primary)] font-medium">
-                        Unlimited
-                      </span>
-                    )}
+                    <span className="text-[10px] text-[var(--text-subtle)]">
+                      {creditsLeft} / {isPro ? 150 : 50} credits left
+                    </span>
                   </div>
                 </div>
                 

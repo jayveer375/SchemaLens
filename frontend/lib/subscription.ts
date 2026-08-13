@@ -9,7 +9,7 @@ export const PLANS: Record<PlanId, Plan> = {
     conversionsPerMonth: 5,
     maxProjects: 3,
     maxImagesPerProject: 5,
-    aiGenerationsPerMonth: 70, // 70 AI SQL generation credits for free users
+    aiGenerationsPerMonth: 50, // 50 AI credits for free users
     zipExport: false,
     priorityQueue: false,
     versionHistory: false,
@@ -23,7 +23,7 @@ export const PLANS: Record<PlanId, Plan> = {
     conversionsPerMonth: 50,
     maxProjects: 25,
     maxImagesPerProject: 25,
-    aiGenerationsPerMonth: 1000, // Unlimited essentially for Pro users
+    aiGenerationsPerMonth: 150, // 150 AI credits for pro users
     zipExport: true,
     priorityQueue: true,
     versionHistory: true,
@@ -101,19 +101,28 @@ export function canUsePlayground(sub: Subscription): boolean {
 }
 
 // ── AI Generation credits helpers ───────────────────────────────────────────────
-export function canGenerateAI(sub: Subscription): boolean {
-  const s = maybeResetMonthly(sub);
-  const plan = PLANS[s.planId];
-  return s.aiGenerationsUsedThisMonth < (s.aiGenerationsLimitOverride ?? plan.aiGenerationsPerMonth);
+
+/** Determines credit cost: 5 credits for small questions, 7 credits for big questions */
+export function getQuestionCreditCost(input: string, mode?: string): number {
+  const trimmed = (input || "").trim();
+  const wordCount = trimmed ? trimmed.split(/\s+/).length : 0;
+  const isBig = mode === "analyze" || mode === "generate" || trimmed.length > 100 || wordCount > 20;
+  return isBig ? 7 : 5;
+}
+
+export function canGenerateAI(sub: Subscription, requiredAmount: number = 5): boolean {
+  const left = aiGenerationsLeft(sub);
+  return left >= requiredAmount;
 }
 
 export function aiGenerationsLeft(sub: Subscription): number {
   const s = maybeResetMonthly(sub);
   const plan = PLANS[s.planId];
-  return Math.max(0, (s.aiGenerationsLimitOverride ?? plan.aiGenerationsPerMonth) - s.aiGenerationsUsedThisMonth);
+  const total = s.aiGenerationsLimitOverride ?? plan.aiGenerationsPerMonth;
+  return Math.max(0, total - s.aiGenerationsUsedThisMonth);
 }
 
-export function incrementAIGenerations(sub: Subscription): Subscription {
+export function incrementAIGenerations(sub: Subscription, amount: number = 1): Subscription {
   const s = maybeResetMonthly(sub);
-  return { ...s, aiGenerationsUsedThisMonth: s.aiGenerationsUsedThisMonth + 1 };
+  return { ...s, aiGenerationsUsedThisMonth: s.aiGenerationsUsedThisMonth + amount };
 }

@@ -8,6 +8,7 @@ import {
   type LucideIcon,
 } from "lucide-react";
 import { useStore } from "@/lib/store";
+import { getQuestionCreditCost, aiGenerationsLeft } from "@/lib/subscription";
 import { cn } from "@/lib/utils";
 import { parseSQLSchema } from "@/lib/sqlParser";
 import { analyzeSchema, generateSchemaAwareMockResponse, type AnalysisResult, type AnalysisFinding, type FindingSeverity } from "@/lib/schemaAnalyzer";
@@ -343,7 +344,7 @@ function LocalAnalysisCard({ result }: { result: AnalysisResult }) {
 // Main page
 // ─────────────────────────────────────────────────────────────────────────────
 export default function AssistantPage({ onNavigate }: { onNavigate: (p: string) => void }) {
-  const { projects, activeProjectId, setActiveProject, playgroundInitialSQL, setPlaygroundInitialSQL, copilotContext } = useStore();
+  const { projects, activeProjectId, setActiveProject, playgroundInitialSQL, setPlaygroundInitialSQL, copilotContext, getSubscription, incrementAIGenerations } = useStore();
 
   const [mode, setMode]     = useState<Mode>("chat");
   const [input, setInput]   = useState("");
@@ -449,6 +450,19 @@ export default function AssistantPage({ onNavigate }: { onNavigate: (p: string) 
       toast.error("Type a question first.");
       return;
     }
+
+    // Check & deduct AI credits (5 for small question, 7 for big question)
+    const cost = getQuestionCreditCost(question, mode);
+    const sub = getSubscription();
+    const creditsRemaining = aiGenerationsLeft(sub);
+
+    if (creditsRemaining < cost) {
+      toast.error(`Insufficient AI credits. Required: ${cost} credits, available: ${creditsRemaining} credits.`);
+      return;
+    }
+
+    incrementAIGenerations(cost);
+    toast.success(`-${cost} AI credits (${creditsRemaining - cost} left)`);
 
     // For chat mode: append user message immediately, stream loading below
     if (mode === "chat") {

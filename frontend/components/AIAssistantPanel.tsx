@@ -24,6 +24,7 @@ import {
   FileCode,
 } from "lucide-react";
 import { useStore } from "@/lib/store";
+import { getQuestionCreditCost, aiGenerationsLeft } from "@/lib/subscription";
 import { parseSQLSchema, type Schema, type Table } from "@/lib/sqlParser";
 import { cn } from "@/lib/utils";
 import toast from "react-hot-toast";
@@ -221,7 +222,7 @@ function CodeSnippet({ sql, onApplyToPlayground }: { sql: string; onApplyToPlayg
 }
 
 export default function AIAssistantPanel() {
-  const { aiAssistantOpen, setAiAssistantOpen, projects, activeProjectId, setActiveProject, playgroundInitialSQL, setPlaygroundInitialSQL, copilotContext } = useStore();
+  const { aiAssistantOpen, setAiAssistantOpen, projects, activeProjectId, setActiveProject, playgroundInitialSQL, setPlaygroundInitialSQL, copilotContext, getSubscription, incrementAIGenerations } = useStore();
   const [input, setInput] = useState("");
   const [isLoading, setIsLoading] = useState(false);
   const [messages, setMessages] = useState<ChatMessage[]>([]);
@@ -320,6 +321,18 @@ export default function AIAssistantPanel() {
     async (textToSend?: string) => {
       const query = (textToSend ?? input).trim();
       if (!query || isLoading) return;
+
+      const cost = getQuestionCreditCost(query, "chat");
+      const sub = getSubscription();
+      const creditsRemaining = aiGenerationsLeft(sub);
+
+      if (creditsRemaining < cost) {
+        toast.error(`Insufficient AI credits. Required: ${cost} credits, available: ${creditsRemaining} credits.`);
+        return;
+      }
+
+      incrementAIGenerations(cost);
+      toast.success(`-${cost} AI credits (${creditsRemaining - cost} left)`);
 
       setErrorMessage(null);
       const userMsg: ChatMessage = {

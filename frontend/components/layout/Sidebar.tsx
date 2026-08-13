@@ -355,25 +355,28 @@ export default function Sidebar({ page, onNavigate }: SidebarProps) {
             <div className="flex items-center gap-2 mb-1">
               <Sparkles size={14} className="text-[var(--primary)]" />
               <span className="text-[11px] font-semibold text-[var(--text)]">AI Credits</span>
+              {isPro && (
+                <span className="ml-auto px-1.5 py-0.2 rounded text-[9px] font-bold bg-purple-500/20 text-purple-400">
+                  PRO
+                </span>
+              )}
             </div>
             <div className="flex items-center justify-between">
-              {isPro ? (
-                <span className="text-[13px] font-bold text-[var(--primary)]">Unlimited</span>
-              ) : (
-                <span className="text-[13px] font-bold text-[var(--text)]">{aiCreditsLeft}</span>
-              )}
-              {!isPro && aiCreditsLeft <= 10 && aiCreditsLeft > 0 && (
+              <span className="text-[13px] font-bold text-[var(--text)]">
+                {aiCreditsLeft} <span className="text-[10px] font-normal text-[var(--text-subtle)]">/ {isPro ? 150 : 50}</span>
+              </span>
+              {aiCreditsLeft <= 15 && aiCreditsLeft > 0 && (
                 <span className="text-[10px] text-amber-500 font-medium">Low</span>
               )}
-              {!isPro && aiCreditsLeft === 0 && (
+              {aiCreditsLeft === 0 && (
                 <span className="text-[10px] text-red-500 font-medium">Exhausted</span>
               )}
             </div>
-            {!isPro && aiCreditsLeft > 0 && (
+            {aiCreditsLeft > 0 && (
               <div className="mt-1.5 h-1.5 bg-[var(--surface)] rounded-full overflow-hidden">
                 <div 
                   className="h-full bg-[var(--primary)] transition-all duration-300"
-                  style={{ width: `${(aiCreditsLeft / 70) * 100}%` }}
+                  style={{ width: `${Math.min(100, (aiCreditsLeft / (isPro ? 150 : 50)) * 100)}%` }}
                 />
               </div>
             )}

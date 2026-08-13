@@ -11,7 +11,7 @@ import {
 } from "lucide-react";
 import { useStore } from "@/lib/store";
 import { parseSQLStats, downloadText, downloadJSON, genId, formatTime, cn } from "@/lib/utils";
-import { canConvert, conversionsLeft, canCreateProject, canGenerateAI, aiGenerationsLeft } from "@/lib/subscription";
+import { canConvert, conversionsLeft, canCreateProject, canGenerateAI, aiGenerationsLeft, getQuestionCreditCost } from "@/lib/subscription";
 import type { Project, DBType } from "@/lib/types";
 import UpgradeLimitDialog from "@/components/UpgradeLimitDialog";
 import dynamic from "next/dynamic";
@@ -483,8 +483,9 @@ export default function GeneratePage({ onNavigate }: { onNavigate: (p: string) =
       return;
     }
 
-    if (!canUseAI) {
-      toast.error("You've used all your AI generation credits. Upgrade to Pro for unlimited access!");
+    const cost = getQuestionCreditCost(aiPrompt, "generate");
+    if (aiCreditsLeft < cost) {
+      toast.error(`Insufficient AI credits. Required: ${cost} credits, available: ${aiCreditsLeft} credits.`);
       window.dispatchEvent(new CustomEvent("navigate", { detail: "pricing" }));
       return;
     }
@@ -513,12 +514,10 @@ export default function GeneratePage({ onNavigate }: { onNavigate: (p: string) =
       const data = await res.json();
       setAiGeneratedSQL(data.sql || "");
       
-      // Increment AI generation credits
-      console.log("Incrementing AI credits...");
-      incrementAIGenerations();
-      console.log("AI credits incremented");
+      // Increment AI generation credits with cost amount
+      incrementAIGenerations(cost);
       
-      toast.success("SQL generated successfully!");
+      toast.success(`SQL generated successfully! (-${cost} AI credits)`);
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : "Failed to generate SQL";
       setAiError(errorMessage);

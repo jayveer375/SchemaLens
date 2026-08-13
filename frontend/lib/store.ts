@@ -54,7 +54,7 @@ interface SubscriptionSlice {
   setSubscription: (s: Subscription) => void;
   upgradeToPro: () => void;
   incrementConversions: () => void;
-  incrementAIGenerations: () => void;
+  incrementAIGenerations: (amount?: number) => void;
   getSubscription: () => Subscription; // always fresh (resets if new month)
 }
 
@@ -186,12 +186,12 @@ export const useStore = create<Store>()(
           }
           return { subscription: updated };
         }),
-      incrementAIGenerations: () =>
+      incrementAIGenerations: (amount: number = 1) =>
         set((state) => {
           const s = maybeResetMonthly(state.subscription);
-          console.log("Before increment:", s.aiGenerationsUsedThisMonth);
-          const updated = incrementAIGenerationsSub(s);
-          console.log("After increment:", updated.aiGenerationsUsedThisMonth);
+          console.log(`Deducting ${amount} AI credits. Current used:`, s.aiGenerationsUsedThisMonth);
+          const updated = incrementAIGenerationsSub(s, amount);
+          console.log("Updated used AI credits:", updated.aiGenerationsUsedThisMonth);
           // Persist the incremented count to the backend so it survives logout/login
           const userId = parseInt(state.user?.id ?? "", 10);
           if (!isNaN(userId)) {
@@ -199,7 +199,10 @@ export const useStore = create<Store>()(
               apiIncrementConversions(userId).catch(() => {});
             }).catch(() => {});
           }
-          return { subscription: updated };
+          return {
+            subscription: updated,
+            user: state.user ? { ...state.user, subscription: updated } : state.user,
+          };
         }),
       getSubscription: () => maybeResetMonthly(get().subscription),
 

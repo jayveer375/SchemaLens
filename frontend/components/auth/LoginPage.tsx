@@ -1,7 +1,8 @@
 "use client";
 import { useState } from "react";
 import { motion } from "framer-motion";
-import { Eye, EyeOff, Mail, Lock, AlertCircle, Chrome } from "lucide-react";
+import { Eye, EyeOff, Mail, Lock, AlertCircle } from "lucide-react";
+import { GoogleLogin } from "@react-oauth/google";
 import { loginUser, googleLogin, seedSuperAdmin } from "@/lib/auth";
 import { apiGetProjects, apiGetQuickHistory } from "@/lib/api";
 import { useStore } from "@/lib/store";
@@ -85,13 +86,48 @@ export default function LoginPage({ onNavigate }: { onNavigate: (page: string) =
     }
   };
 
-  const handleGoogle = async () => {
+  const handleGoogle = async (credentialResponse: any) => {
     setLoading(true);
+    setError("");
     try {
-      const { user, token } = await googleLogin();
+      const result = await googleLogin(credentialResponse.credential);
+      const { user, token, projects: prefetchedProjects, quickHistory: prefetchedQH, needs_password_setup } = result as any;
+      
+      // Check if new Google user needs password setup BEFORE logging in
+      if (needs_password_setup) {
+        // Store user data temporarily but DON'T log them in yet
+        sessionStorage.setItem("pending_google_user", JSON.stringify({ user, token, projects: prefetchedProjects, quickHistory: prefetchedQH }));
+        toast.success("Welcome! Please set a password for your account.");
+        onNavigate("setPassword");
+        return;  // Stop here - don't log them in yet
+      }
+      
+      // Existing user - log them in normally
       setUser(user);
       setToken(token);
-      toast.success("Signed in with Google!");
+
+      const numericId = parseInt(user.id, 10);
+      if (!isNaN(numericId)) {
+        try {
+          const projects  = prefetchedProjects  ?? await apiGetProjects(numericId);
+          const qHistory  = prefetchedQH        ?? await apiGetQuickHistory(numericId);
+          const mapped: Project[] = (projects || []).map((p: any) => ({
+            id: p.id, ownerId: user.id, name: p.name,
+            description: p.description, dbType: p.db_type as any,
+            createdAt: new Date(p.created_at).getTime(),
+            updatedAt: new Date(p.updated_at).getTime(),
+            files: (p.files as any[]) ?? [], pinned: p.pinned,
+          }));
+          const mappedQH: QuickConvertResult[] = (qHistory || []).map((e: any) => ({
+            id: e.id, filename: e.filename, sql: e.sql,
+            stats: e.stats as any, processingTime: e.processingTime,
+            timestamp: e.timestamp, imageUrl: e.imageUrl ?? "",
+          }));
+          useStore.setState({ projects: mapped, quickHistory: mappedQH, subscription: user.subscription ?? useStore.getState().subscription });
+        } catch { /* non-fatal */ }
+      }
+
+      toast.success(`Welcome back, ${user.name}!`);
       onNavigate("dashboard");
     } catch (err: any) {
       setError(err.message);
@@ -183,14 +219,18 @@ export default function LoginPage({ onNavigate }: { onNavigate: (page: string) =
         <div className="flex-1 h-px bg-[var(--border)]" />
       </div>
 
-      {/* Google - moved below Sign in button */}
-      <button onClick={handleGoogle} disabled={loading}
-        className="w-full flex items-center justify-center gap-3 py-3.5 rounded-2xl text-base font-medium
-          border-2 border-[var(--border)] bg-[var(--card)] text-[var(--text)]
-          hover:bg-[var(--surface)] hover:border-primary-400 transition-all disabled:opacity-60 mb-6">
-        <Chrome size={18} className="text-blue-500" />
-        Continue with Google
-      </button>
+      {/* Google */}
+      <div className="flex justify-center mb-6">
+        <GoogleLogin
+          onSuccess={handleGoogle}
+          onError={() => setError("Google sign-in failed. Please try again.")}
+          theme="outline"
+          size="large"
+          text="continue_with"
+          shape="rectangular"
+          width="400"
+        />
+      </div>
 
       <p className="text-center text-base text-[var(--text-muted)] mt-8">
         Don't have an account?{" "}

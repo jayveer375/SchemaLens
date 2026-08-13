@@ -17,6 +17,8 @@ import string
 import smtplib
 from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
+from google.oauth2 import id_token as google_id_token
+from google.auth.transport import requests as google_requests
 
 from database import get_db
 from models import User, Image, Conversion, ApiUsage, ExportLog, UserActivity, ProjectImage
@@ -130,6 +132,102 @@ def login(payload: dict, request: Request, background_tasks: BackgroundTasks, db
     }
 
 
+# ── Google OAuth login / register ────────────────────────────────────────────
+@app.post("/auth/google")
+def google_auth(payload: dict, request: Request, background_tasks: BackgroundTasks, db: Session = Depends(get_db)):
+    """
+    Accepts a Google ID token from the frontend.
+    Verifies it with Google, then either logs in the existing user
+    or creates a new account — no password required.
+    """
+    credential = payload.get("credential", "")
+    if not credential:
+        raise HTTPException(status_code=400, detail="Google credential token is required")
+
+    google_client_id = os.getenv("GOOGLE_CLIENT_ID", "")
+    if not google_client_id:
+        raise HTTPException(status_code=500, detail="Google OAuth is not configured on the server")
+
+    # ── Verify the ID token with Google ──────────────────────────────────────
+    try:
+        id_info = google_id_token.verify_oauth2_token(
+            credential,
+            google_requests.Request(),
+            google_client_id,
+            clock_skew_in_seconds=60,  # Allow 60 seconds tolerance for clock differences
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=401, detail=f"Invalid Google token: {exc}")
+
+    g_id    = id_info["sub"]           # stable Google user ID
+    email   = id_info.get("email", "").strip().lower()
+    name    = id_info.get("name", email.split("@")[0])
+    picture = id_info.get("picture")   # Google profile photo URL
+
+    if not email:
+        raise HTTPException(status_code=400, detail="Google account has no email address")
+
+    # ── Find existing user: first by google_id, then by email ─────────────────
+    user = db.query(User).filter(User.google_id == g_id).first()
+    needs_password_setup = False  # Track if user is brand new
+
+    if not user:
+        user = db.query(User).filter(User.email == email).first()
+        if user:
+            # Existing email/password account — link Google ID to it
+            user.google_id = g_id
+            if not user.avatar_url and picture:
+                user.avatar_url = picture
+            db.commit()
+        else:
+            # Brand-new user — create account (no password)
+            user = User(
+                full_name=name,
+                email=email,
+                password_hash="",          # no password for Google users
+                google_id=g_id,
+                role="user",
+                plan="free",
+                is_active=True,
+                email_verified=True,       # Google already verified it
+                conversions_used_this_month=0,
+                avatar_url=picture,
+            )
+            db.add(user)
+            db.commit()
+            db.refresh(user)
+            background_tasks.add_task(
+                log_activity_bg, "register", user_id=user.id,
+                description=f"Google sign-up: {email}",
+                ip_address=get_ip(request),
+            )
+            # Flag: new user needs password setup
+            needs_password_setup = True
+
+    if not user.is_active:
+        raise HTTPException(status_code=403, detail="Account is disabled")
+
+    # Update last_login
+    background_tasks.add_task(
+        log_login_success_bg, user.id,
+        ip_address=get_ip(request),
+        user_agent=request.headers.get("User-Agent"),
+    )
+
+    # Return same shape as /login so frontend reuse is trivial
+    from models import Project as ProjectModel, QuickHistory
+    projects  = db.query(ProjectModel).filter(ProjectModel.user_id == user.id).all()
+    q_history = db.query(QuickHistory).filter(QuickHistory.user_id == user.id).order_by(QuickHistory.created_at.desc()).limit(20).all()
+
+    return {
+        "message": "Google login successful",
+        "user": _user_dict(user),
+        "projects": [_project_dict(p) for p in projects],
+        "quick_history": [_quick_history_dict(e) for e in q_history],
+        "needs_password_setup": needs_password_setup,  # Tell frontend if new user
+    }
+
+
 # ── Get user profile + all their data ────────────────────────────────────────
 @app.get("/user/{user_id}")
 def get_user(user_id: int, db: Session = Depends(get_db)):
@@ -166,6 +264,32 @@ def change_password(user_id: int, payload: dict, request: Request, background_ta
     )
 
     return {"message": "Password updated successfully"}
+
+
+# ── Set password (for Google users who don't have one) ────────────────────────
+@app.post("/user/{user_id}/set-password")
+def set_password(user_id: int, payload: dict, request: Request, background_tasks: BackgroundTasks, db: Session = Depends(get_db)):
+    new_pw = payload.get("new_password", "")
+
+    if not new_pw:
+        raise HTTPException(status_code=400, detail="new_password is required")
+    if len(new_pw) < 8:
+        raise HTTPException(status_code=400, detail="Password must be at least 8 characters")
+
+    user = db.query(User).filter(User.id == user_id).first()
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+
+    # Set the password (works for Google users with empty password_hash)
+    user.password_hash = bcrypt.hashpw(new_pw.encode(), bcrypt.gensalt()).decode()
+    db.commit()
+
+    background_tasks.add_task(
+        log_activity_bg, "password_set", user_id=user_id,
+        description="Password set for Google account", ip_address=get_ip(request)
+    )
+
+    return {"message": "Password set successfully"}
 
 
 # In-memory OTP storage (in production, use Redis or database)
@@ -1128,6 +1252,7 @@ def _user_dict(u: User) -> dict:
         "created_at": str(u.created_at),
         "last_login": str(u.last_login) if u.last_login else None,
         "conversions_used_this_month": u.conversions_used_this_month,
+        "is_google_user": bool(getattr(u, "google_id", None)),
     }
 
 def _project_dict(p) -> dict:

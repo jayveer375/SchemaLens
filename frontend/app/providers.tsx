@@ -1,5 +1,6 @@
 "use client";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import { GoogleOAuthProvider } from "@react-oauth/google";
 import { useEffect } from "react";
 import { useStore } from "@/lib/store";
 import { seedSuperAdmin } from "@/lib/auth";
@@ -9,28 +10,29 @@ const queryClient = new QueryClient({
   defaultOptions: { queries: { staleTime: 1000 * 60 * 5 } },
 });
 
+const GOOGLE_CLIENT_ID = process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID ?? "";
+
 export default function Providers({ children }: { children: React.ReactNode }) {
   const { theme } = useStore();
 
   useEffect(() => {
     seedSuperAdmin();
-    // Apply the persisted theme immediately on mount
     document.documentElement.classList.toggle("dark", theme === "dark");
   }, []);
 
-  // Keep the class in sync whenever the user switches theme
   useEffect(() => {
     document.documentElement.classList.toggle("dark", theme === "dark");
-    // Also smooth-transition the background colour change
     document.documentElement.style.colorScheme = theme;
   }, [theme]);
 
   return (
-    <QueryClientProvider client={queryClient}>
-      <SmoothScroll>
-        {children}
-      </SmoothScroll>
-    </QueryClientProvider>
+    <GoogleOAuthProvider clientId={GOOGLE_CLIENT_ID}>
+      <QueryClientProvider client={queryClient}>
+        <SmoothScroll>
+          {children}
+        </SmoothScroll>
+      </QueryClientProvider>
+    </GoogleOAuthProvider>
   );
 }
 

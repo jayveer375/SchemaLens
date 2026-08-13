@@ -7,6 +7,7 @@ import AuthLayout from "@/components/auth/AuthLayout";
 import LoginPage from "@/components/auth/LoginPage";
 import RegisterPage from "@/components/auth/RegisterPage";
 import ForgotPasswordPage from "@/components/auth/ForgotPasswordPage";
+import SetPasswordPage from "@/components/auth/SetPasswordPage";
 
 // Layout
 import Sidebar from "@/components/layout/Sidebar";
@@ -35,7 +36,7 @@ import { LayoutDashboard, FolderOpen, History, Settings, Shield } from "lucide-r
 
 const DatabaseScene = dynamic(() => import("@/components/ambient/DatabaseScene"), { ssr: false });
 
-type AuthPage = "login" | "register" | "forgot";
+type AuthPage = "login" | "register" | "forgot" | "setPassword";
 type AppPage  = "dashboard" | "projects" | "project-detail" | "history" | "quick-convert" | "generate" | "migrate" | "playground" | "assistant" | "pricing" | "profile" | "usage" | "settings" | "admin";
 
 export default function RootPage() {
@@ -91,6 +92,14 @@ export default function RootPage() {
           {authPage === "forgot" && (
             <motion.div key="forgot" initial={{opacity:0,y:8}} animate={{opacity:1,y:0}} exit={{opacity:0,y:-8}} transition={{duration:0.2}}>
               <ForgotPasswordPage onNavigate={(p) => setAuthPage(p as AuthPage)} />
+            </motion.div>
+          )}
+          {authPage === "setPassword" && (
+            <motion.div key="setPassword" initial={{opacity:0,y:8}} animate={{opacity:1,y:0}} exit={{opacity:0,y:-8}} transition={{duration:0.2}}>
+              <SetPasswordPage onNavigate={(p) => {
+                if (p === "dashboard") setAppPage("dashboard");
+                else setAuthPage(p as AuthPage);
+              }} />
             </motion.div>
           )}
         </AnimatePresence>

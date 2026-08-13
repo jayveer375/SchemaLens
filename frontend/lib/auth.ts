@@ -158,23 +158,20 @@ export async function loginUser(
   };
 }
 
-// ── Google login (mock — unchanged) ──────────────────────────────────────────
-export async function googleLogin(): Promise<{ user: User; token: string }> {
-  await delay(700);
-  const userId = genId();
-  const user: User = {
-    id: userId,
-    name: "Google User",
-    email: `google_${userId.slice(0, 8)}@example.com`,
-    role: "user",
-    createdAt: Date.now(),
-    emailVerified: true,
-    lastLogin: Date.now(),
+// ── Google login — calls real backend ────────────────────────────────────────
+export async function googleLogin(credential: string): Promise<{ user: User; token: string; projects?: any[]; quickHistory?: any[]; needs_password_setup?: boolean }> {
+  const { apiGoogleLogin } = await import("./api");
+  const result = await apiGoogleLogin(credential);
+  const user   = backendToFrontendUser(result.user);
+  user.lastLogin = Date.now();
+  const token  = buildToken(user);
+  return {
+    user,
+    token,
+    projects: result.projects,
+    quickHistory: result.quick_history,
+    needs_password_setup: result.needs_password_setup,  // Pass through from backend
   };
-  const users = getUsers();
-  users.push(user);
-  saveUsers(users);
-  return { user, token: buildToken(user) };
 }
 
 // ── Forgot password (mock — unchanged) ───────────────────────────────────────

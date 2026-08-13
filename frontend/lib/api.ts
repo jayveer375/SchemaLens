@@ -55,6 +55,12 @@ export async function apiLogin(p: { email: string; password: string }) {
   });
 }
 
+export async function apiGoogleLogin(credential: string) {
+  return request<{ message: string; user: BackendUser; projects?: any[]; quick_history?: any[]; needs_password_setup?: boolean }>("/auth/google", {
+    method: "POST", body: JSON.stringify({ credential }),
+  });
+}
+
 // ─── Profile ──────────────────────────────────────────────────────────────────
 
 export async function apiGetUser(userId: number) {

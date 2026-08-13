@@ -38,6 +38,8 @@ class User(Base):
     # conversions used this billing month (mirrors frontend store)
     conversions_used_this_month: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
     avatar_url: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    # Google OAuth — null for email/password users
+    google_id: Mapped[Optional[str]] = mapped_column(String(128), nullable=True, unique=True, index=True)
 
     # Relationships (one user → many of each)
     images: Mapped[List["Image"]] = relationship("Image", back_populates="user", cascade="all, delete-orphan")

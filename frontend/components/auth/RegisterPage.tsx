@@ -2,9 +2,11 @@
 import { useState } from "react";
 import { motion } from "framer-motion";
 import { Eye, EyeOff, Mail, Lock, User, AlertCircle, CheckCircle } from "lucide-react";
-import { registerUser } from "@/lib/auth";
+import { GoogleLogin } from "@react-oauth/google";
+import { registerUser, googleLogin } from "@/lib/auth";
 import { useStore } from "@/lib/store";
 import toast from "react-hot-toast";
+import type { Project, QuickConvertResult } from "@/lib/types";
 
 export default function RegisterPage({ onNavigate }: { onNavigate: (p: string) => void }) {
   const { setUser, setToken } = useStore();
@@ -16,6 +18,52 @@ export default function RegisterPage({ onNavigate }: { onNavigate: (p: string) =
 
   const f = (k: string) => (e: React.ChangeEvent<HTMLInputElement>) =>
     setForm((p) => ({ ...p, [k]: e.target.value }));
+
+  const handleGoogle = async (credentialResponse: any) => {
+    setError("");
+    setLoading(true);
+    try {
+      const result = await googleLogin(credentialResponse.credential);
+      const { user, token, projects: prefetchedProjects, quickHistory: prefetchedQH, needs_password_setup } = result as any;
+      
+      // Check if new Google user needs password setup BEFORE logging in
+      if (needs_password_setup) {
+        // Store user data temporarily but DON'T log them in yet
+        sessionStorage.setItem("pending_google_user", JSON.stringify({ user, token, projects: prefetchedProjects, quickHistory: prefetchedQH }));
+        toast.success("Welcome! Please set a password for your account.");
+        onNavigate("setPassword");
+        return;  // Stop here - don't log them in yet
+      }
+      
+      // Existing user - log them in normally
+      setUser(user); 
+      setToken(token);
+      const { apiGetProjects, apiGetQuickHistory } = await import("@/lib/api");
+      const numericId = parseInt(user.id, 10);
+      if (!isNaN(numericId)) {
+        try {
+          const projects = prefetchedProjects ?? await apiGetProjects(numericId);
+          const qHistory = prefetchedQH        ?? await apiGetQuickHistory(numericId);
+          const mapped: Project[] = (projects || []).map((p: any) => ({
+            id: p.id, ownerId: user.id, name: p.name,
+            description: p.description, dbType: p.db_type as any,
+            createdAt: new Date(p.created_at).getTime(),
+            updatedAt: new Date(p.updated_at).getTime(),
+            files: (p.files as any[]) ?? [], pinned: p.pinned,
+          }));
+          const mappedQH: QuickConvertResult[] = (qHistory || []).map((e: any) => ({
+            id: e.id, filename: e.filename, sql: e.sql,
+            stats: e.stats as any, processingTime: e.processingTime,
+            timestamp: e.timestamp, imageUrl: e.imageUrl ?? "",
+          }));
+          useStore.setState({ projects: mapped, quickHistory: mappedQH });
+        } catch { /* non-fatal */ }
+      }
+      toast.success(`Welcome, ${user.name}!`);
+      onNavigate("dashboard");
+    } catch (err: any) { setError(err.message); }
+    finally { setLoading(false); }
+  };
 
   const handle = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -114,6 +162,26 @@ export default function RegisterPage({ onNavigate }: { onNavigate: (p: string) =
           ) : "Create Account"}
         </motion.button>
       </form>
+
+      {/* Divider */}
+      <div className="flex items-center gap-4 my-6">
+        <div className="flex-1 h-px bg-[var(--border)]" />
+        <span className="text-sm text-[var(--text-subtle)] whitespace-nowrap">or</span>
+        <div className="flex-1 h-px bg-[var(--border)]" />
+      </div>
+
+      {/* Google */}
+      <div className="flex justify-center mb-6">
+        <GoogleLogin
+          onSuccess={handleGoogle}
+          onError={() => setError("Google sign-up failed. Please try again.")}
+          theme="outline"
+          size="large"
+          text="signup_with"
+          shape="rectangular"
+          width="400"
+        />
+      </div>
 
       <p className="text-center text-base text-[var(--text-muted)] mt-8">
         Already have an account?{" "}

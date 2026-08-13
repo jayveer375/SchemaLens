@@ -286,7 +286,6 @@ export default function GeneratePage({ onNavigate }: { onNavigate: (p: string) =
         theme: theme === "dark" ? "dark" : "default",
         er: { diagramPadding: 20, layoutDirection: "TB", minEntityWidth: 100 },
         flowchart: { curve: "basis", padding: 20, htmlLabels: true },
-        classDiagram: { diagramPadding: 20 },
         securityLevel: "loose",
       });
       const id = `mermaid-${genId()}`;

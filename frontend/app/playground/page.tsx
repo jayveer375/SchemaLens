@@ -273,9 +273,16 @@ function PlaygroundLocked() {
   );
 }
 
+function sanitizeSQLContext(text: string): string {
+  if (!text) return "";
+  return text
+    .replace(/(password|secret|pwd|api_key|token)\s*(=|:)\s*['"][^'"]+['"]/gi, "$1 = '***MASKED***'")
+    .replace(/(password|secret|pwd|api_key|token)\s*(=|:)\s*([^\s,;\)]+)/gi, "$1 = ***MASKED***");
+}
+
 // ── Main Component ─────────────────────────────────────────────────────────────
 export default function PlaygroundPage() {
-  const { theme, playgroundInitialSQL, setPlaygroundInitialSQL, getSubscription, incrementAIGenerations } = useStore();
+  const { theme, playgroundInitialSQL, setPlaygroundInitialSQL, setCopilotContext, getSubscription, incrementAIGenerations } = useStore();
   const subscription = getSubscription();
   const isPro = canUsePlayground(subscription);
   const canUseAI = canGenerateAI(subscription);
@@ -311,6 +318,14 @@ export default function PlaygroundPage() {
   const [aiError, setAiError] = useState<string | null>(null);
 
   const monacoTheme = theme === "dark" ? "playground-dark" : "playground-light";
+
+  // Sync Copilot Context with store whenever SQL or diagram mode changes
+  useEffect(() => {
+    setCopilotContext({
+      source: erDiagramOpen ? "er-diagram" : "playground",
+      currentSql: sanitizeSQLContext(sql),
+    });
+  }, [sql, erDiagramOpen, setCopilotContext]);
 
   // ── Register custom Monaco themes ─────────────────────────────────────────
   const handleEditorWillMount = useCallback((monaco: any) => {
@@ -379,6 +394,27 @@ export default function PlaygroundPage() {
       monacoRef.current = monaco;
       monaco.editor.setTheme(monacoTheme);
 
+      // Listen for text selections to update Copilot context
+      editor.onDidChangeCursorSelection(() => {
+        const selection = editor.getSelection();
+        const model = editor.getModel();
+        if (selection && model && !selection.isEmpty()) {
+          const selectedText = model.getValueInRange(selection);
+          const lineCount = Math.abs(selection.endLineNumber - selection.startLineNumber) + 1;
+          setCopilotContext({
+            source: "playground",
+            selectedSql: sanitizeSQLContext(selectedText),
+            selectedLinesCount: lineCount,
+          });
+        } else {
+          setCopilotContext({
+            source: "playground",
+            selectedSql: undefined,
+            selectedLinesCount: undefined,
+          });
+        }
+      });
+
       // Ctrl+Enter → run SQL
       editor.addCommand(
         monaco.KeyMod.CtrlCmd | monaco.KeyCode.Enter,
@@ -404,7 +440,7 @@ export default function PlaygroundPage() {
         }
       );
     },
-    [monacoTheme]
+    [monacoTheme, setCopilotContext]
   );
 
   // ── Sync theme when site theme changes ────────────────────────────────────

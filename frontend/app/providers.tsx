@@ -3,6 +3,7 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { useEffect } from "react";
 import { useStore } from "@/lib/store";
 import { seedSuperAdmin } from "@/lib/auth";
+import SmoothScroll from "@/components/layout/SmoothScroll";
 
 const queryClient = new QueryClient({
   defaultOptions: { queries: { staleTime: 1000 * 60 * 5 } },
@@ -26,7 +27,10 @@ export default function Providers({ children }: { children: React.ReactNode }) {
 
   return (
     <QueryClientProvider client={queryClient}>
-      {children}
+      <SmoothScroll>
+        {children}
+      </SmoothScroll>
     </QueryClientProvider>
   );
 }
+

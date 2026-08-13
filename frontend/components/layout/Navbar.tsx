@@ -1,7 +1,7 @@
 "use client";
 import { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { Sun, Moon, Search, CheckCircle2, User, Settings, LogOut, ArrowRight } from "lucide-react";
+import { Sun, Moon, Search, CheckCircle2, User, Settings, LogOut, ArrowRight, Sparkles } from "lucide-react";
 import { useStore } from "@/lib/store";
 import { initials, cn } from "@/lib/utils";
 import { getPlan } from "@/lib/subscription";
@@ -60,6 +60,21 @@ export default function Navbar({ onNavigate, page }: NavbarProps) {
         )}
 
         <div className="ml-auto flex items-center gap-2">
+          {/* AI Assistant Button */}
+          {!isAdminPage && (
+            <motion.button
+              whileTap={{ scale: 0.95 }}
+              onClick={() => useStore.getState().setAiAssistantOpen(true)}
+              className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl border border-[var(--border)]
+                bg-[var(--surface)] text-[var(--text-muted)] hover:text-[var(--text)] hover:border-[var(--primary)]/50
+                transition-all text-xs font-semibold"
+              title="Open AI Assistant Panel"
+            >
+              <Sparkles size={14} className="text-[var(--primary)]" />
+              <span className="hidden sm:inline">AI Assistant</span>
+            </motion.button>
+          )}
+
           {/* Theme */}
           <motion.button whileTap={{ scale: 0.9 }}
             onClick={() => setTheme(theme === "light" ? "dark" : "light")}

@@ -42,9 +42,11 @@ interface UISlice {
   theme: "light" | "dark";
   selectedLanguage: string;
   sidebarCollapsed: boolean;
+  aiAssistantOpen: boolean;
   setTheme: (t: "light" | "dark") => void;
   setSelectedLanguage: (l: string) => void;
   setSidebarCollapsed: (v: boolean) => void;
+  setAiAssistantOpen: (open: boolean) => void;
 }
 
 interface SubscriptionSlice {
@@ -94,12 +96,24 @@ interface AdminSlice {
   setActivityLogs: (l: ActivityLog[]) => void;
 }
 
+export interface CopilotContext {
+  source: "playground" | "er-diagram" | "general";
+  currentSql?: string;
+  selectedSql?: string;
+  selectedLinesCount?: number;
+}
+
+interface CopilotSlice {
+  copilotContext: CopilotContext;
+  setCopilotContext: (ctx: Partial<CopilotContext>) => void;
+}
+
 interface PlaygroundSlice {
   playgroundInitialSQL: string | null;
   setPlaygroundInitialSQL: (sql: string | null) => void;
 }
 
-type Store = AuthSlice & UISlice & SubscriptionSlice & QuickConvertSlice & LegacyAnalysisSlice & ProjectsSlice & AdminSlice & PlaygroundSlice;
+type Store = AuthSlice & UISlice & SubscriptionSlice & QuickConvertSlice & LegacyAnalysisSlice & ProjectsSlice & AdminSlice & PlaygroundSlice & CopilotSlice;
 
 export const useStore = create<Store>()(
   persist(
@@ -130,6 +144,7 @@ export const useStore = create<Store>()(
       theme: "light",
       selectedLanguage: "postgresql",
       sidebarCollapsed: false,
+      aiAssistantOpen: false,
       setTheme: (theme) => {
         set({ theme });
         if (typeof document !== "undefined")
@@ -137,6 +152,7 @@ export const useStore = create<Store>()(
       },
       setSelectedLanguage: (l) => set({ selectedLanguage: l }),
       setSidebarCollapsed: (v) => set({ sidebarCollapsed: v }),
+      setAiAssistantOpen: (open) => set({ aiAssistantOpen: open }),
 
       // ── Subscription ────────────────────────────────────────────────────────
       subscription: defaultSubscription(),
@@ -274,6 +290,13 @@ export const useStore = create<Store>()(
       // ── Playground ──────────────────────────────────────────────────────────
       playgroundInitialSQL: null,
       setPlaygroundInitialSQL: (sql) => set({ playgroundInitialSQL: sql }),
+
+      // ── Copilot Context ─────────────────────────────────────────────────────
+      copilotContext: { source: "general" },
+      setCopilotContext: (ctx) =>
+        set((state) => ({
+          copilotContext: { ...state.copilotContext, ...ctx },
+        })),
     }),
     {
       name: "er-ai-studio-v4",

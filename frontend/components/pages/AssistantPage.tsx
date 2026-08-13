@@ -1,15 +1,23 @@
 "use client";
-import { useState, useCallback, useRef, useEffect } from "react";
+import { useState, useCallback, useRef, useEffect, useMemo } from "react";
 import {
   Bot, Wand2, Search, Database, Copy, ExternalLink,
   CheckCircle2, AlertTriangle, XCircle, Loader2, ChevronRight,
   MessageCircle, Send, Trash2, Zap, ShieldAlert, Lightbulb,
+  Plus, FileCode, X,
   type LucideIcon,
 } from "lucide-react";
 import { useStore } from "@/lib/store";
 import { cn } from "@/lib/utils";
-import { analyzeSchema, type AnalysisResult, type AnalysisFinding, type FindingSeverity } from "@/lib/schemaAnalyzer";
+import { parseSQLSchema } from "@/lib/sqlParser";
+import { analyzeSchema, generateSchemaAwareMockResponse, type AnalysisResult, type AnalysisFinding, type FindingSeverity } from "@/lib/schemaAnalyzer";
 import toast from "react-hot-toast";
+import {
+  SQLResponseCard,
+  SchemaIssueCard,
+  AISuggestionCard,
+  ExplanationResponseCard,
+} from "@/components/AIResponseCards";
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Types
@@ -186,39 +194,12 @@ function LoadingDots() {
 }
 
 function SQLBlock({ sql, onOpenPlayground }: { sql: string; onOpenPlayground?: (s: string) => void }) {
-  const [copied, setCopied] = useState(false);
-  const copy = async () => {
-    await navigator.clipboard.writeText(sql);
-    setCopied(true);
-    toast.success("SQL copied!");
-    setTimeout(() => setCopied(false), 2000);
-  };
   return (
-    <div className="mt-2 rounded-xl border border-[var(--border)] overflow-hidden">
-      <div className="flex items-center justify-between px-3 py-2 border-b border-[var(--border)]"
-        style={{ background: "var(--surface)" }}>
-        <span className="text-[10px] font-bold uppercase tracking-widest text-[var(--text-subtle)]">SQL</span>
-        <div className="flex items-center gap-1.5">
-          <button onClick={copy}
-            className={cn("flex items-center gap-1 px-2 py-1 rounded-lg text-[10px] font-semibold border transition-all",
-              copied
-                ? "bg-emerald-50 dark:bg-emerald-500/10 text-emerald-600 border-emerald-200 dark:border-emerald-500/20"
-                : "border-[var(--border)] text-[var(--text-muted)] bg-[var(--card)] hover:text-[var(--text)]")}>
-            <Copy size={10} />{copied ? "Copied!" : "Copy"}
-          </button>
-          {onOpenPlayground && (
-            <button onClick={() => onOpenPlayground(sql)}
-              className="flex items-center gap-1 px-2 py-1 rounded-lg text-[10px] font-semibold border border-[var(--border)] text-[var(--text-muted)] bg-[var(--card)] hover:text-[var(--primary)] transition-all">
-              <ExternalLink size={10} />Playground
-            </button>
-          )}
-        </div>
-      </div>
-      <pre className="px-3 py-3 text-xs font-mono text-[var(--text)] overflow-x-auto leading-relaxed"
-        style={{ background: "var(--card)", maxHeight: 260, overflowY: "auto" }}>
-        {sql}
-      </pre>
-    </div>
+    <SQLResponseCard
+      sql={sql}
+      label="Generated SQL"
+      onOpenPlayground={onOpenPlayground}
+    />
   );
 }
 
@@ -251,46 +232,40 @@ const SEVERITY_CONFIG: Record<FindingSeverity, {
   suggestion: { icon: Lightbulb,     color: "text-blue-600",   bg: "bg-blue-50 dark:bg-blue-500/10",       border: "border-blue-200 dark:border-blue-500/20",     groupLabel: "Suggestions" },
 };
 
-function FindingRow({ f }: { f: AnalysisFinding }) {
-  const cfg  = SEVERITY_CONFIG[f.severity];
-  const Icon = cfg.icon;
-  const [showFix, setShowFix] = useState(false);
+function FindingRow({ f, onOpenPlayground }: { f: AnalysisFinding; onOpenPlayground?: (s: string) => void }) {
+  const extractedSql = f.fixHint && /(CREATE|ALTER|DROP|SELECT|INSERT|UPDATE|DELETE|ADD CONSTRAINT)/i.test(f.fixHint)
+    ? f.fixHint
+    : undefined;
+
+  if (f.severity === "suggestion") {
+    return (
+      <AISuggestionCard
+        title={f.title}
+        suggestion={f.detail}
+        reason="Schema design review recommendation."
+        expectedBenefit="Improves data consistency and query performance."
+        sqlFix={extractedSql}
+        onOpenPlayground={onOpenPlayground}
+      />
+    );
+  }
 
   return (
-    <div className={cn("rounded-xl p-3.5 border", cfg.bg, cfg.border)}>
-      <div className="flex items-start gap-3">
-        <Icon size={14} className={cn("flex-shrink-0 mt-0.5", cfg.color)} />
-        <div className="min-w-0 flex-1">
-          <div className="flex items-center gap-2 flex-wrap">
-            <p className={cn("text-sm font-semibold leading-tight", cfg.color)}>{f.title}</p>
-            {f.table && (
-              <span className="text-[9px] font-mono px-1.5 py-0.5 rounded"
-                style={{ background: "var(--card)", border: "1px solid var(--border)", color: "var(--text-subtle)" }}>
-                {f.table}{f.column ? `.${f.column}` : ""}
-              </span>
-            )}
-          </div>
-          <p className="text-xs text-[var(--text-muted)] mt-1 leading-relaxed">{f.detail}</p>
-          {f.fixHint && (
-            <div className="mt-2">
-              {!showFix ? (
-                <button
-                  onClick={() => setShowFix(true)}
-                  className={cn("text-[10px] font-semibold hover:underline", cfg.color)}
-                >
-                  View fix hint →
-                </button>
-              ) : (
-                <pre className="mt-1 text-[10px] font-mono rounded-lg px-3 py-2 leading-relaxed break-all whitespace-pre-wrap"
-                  style={{ background: "var(--card)", border: "1px solid var(--border)", color: "var(--text-muted)" }}>
-                  {f.fixHint}
-                </pre>
-              )}
-            </div>
-          )}
-        </div>
-      </div>
-    </div>
+    <SchemaIssueCard
+      title={f.title}
+      severity={f.severity === "error" ? "error" : "warning"}
+      explanation={f.detail}
+      whyItMatters={
+        f.severity === "error"
+          ? "Critical database structure issue that violates referential integrity or standard SQL execution."
+          : "Potential performance bottleneck during JOIN execution or missing database index."
+      }
+      suggestedSolution={f.fixHint || "Add appropriate primary keys, foreign key constraints, or indexes."}
+      sqlFix={extractedSql}
+      table={f.table}
+      column={f.column}
+      onOpenPlayground={onOpenPlayground}
+    />
   );
 }
 
@@ -368,12 +343,14 @@ function LocalAnalysisCard({ result }: { result: AnalysisResult }) {
 // Main page
 // ─────────────────────────────────────────────────────────────────────────────
 export default function AssistantPage({ onNavigate }: { onNavigate: (p: string) => void }) {
-  const { projects, activeProjectId, playgroundInitialSQL, setPlaygroundInitialSQL } = useStore();
+  const { projects, activeProjectId, setActiveProject, playgroundInitialSQL, setPlaygroundInitialSQL, copilotContext } = useStore();
 
   const [mode, setMode]     = useState<Mode>("chat");
   const [input, setInput]   = useState("");
   const [status, setStatus] = useState<Status>("idle");
   const [errorMsg, setError] = useState("");
+  const [showPasteModal, setShowPasteModal] = useState(false);
+  const [pastedSQL, setPastedSQL] = useState("");
 
   // Dedicated mode results
   const [explanation,  setExplanation]  = useState("");
@@ -393,10 +370,46 @@ export default function AssistantPage({ onNavigate }: { onNavigate: (p: string) 
   const activeProject = activeProjectId ? projects.find(p => p.id === activeProjectId) : null;
   const tableCount    = parseSchema(schema).length;
 
+  const copilotQuickActions = useMemo(() => {
+    if (copilotContext?.source === "playground") {
+      return [
+        { label: "Explain SQL", mode: "chat" as Mode, input: "Explain this SQL query in detail step-by-step." },
+        { label: "Optimize SQL", mode: "chat" as Mode, input: "Optimize this SQL query for performance and indexing." },
+        { label: "Find Issues", mode: "chat" as Mode, input: "Check this SQL query for syntax errors, missing constraints, or risks." },
+        { label: "Generate Alternative", mode: "chat" as Mode, input: "Provide a clean alternative version of this SQL query." },
+      ];
+    }
+    if (copilotContext?.source === "er-diagram") {
+      return [
+        { label: "Analyze Diagram", mode: "analyze" as Mode, input: "" },
+        { label: "Explain Relationships", mode: "chat" as Mode, input: "List and explain all foreign key relationships in this ER diagram." },
+        { label: "Find Problems", mode: "analyze" as Mode, input: "" },
+        { label: "Suggest Improvements", mode: "chat" as Mode, input: "Suggest table, column, and relationship improvements for this ER diagram." },
+      ];
+    }
+    return [
+      { label: "Explain Schema", mode: "chat" as Mode, input: "Explain this database structure in plain English. Describe what each table does and how they relate." },
+      { label: "Find Relationships", mode: "chat" as Mode, input: "Which tables are related to each other? List all foreign key relationships and explain what they mean." },
+      { label: "Suggest Indexes", mode: "chat" as Mode, input: "Suggest indexes that would improve query performance on this schema." },
+      { label: "Check Normalization", mode: "analyze" as Mode, input: "" },
+    ];
+  }, [copilotContext?.source]);
+
   // Auto-scroll chat to bottom
   useEffect(() => {
     chatEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [chatHistory, status]);
+
+  const handleConnectPastedSchema = () => {
+    if (!pastedSQL.trim()) {
+      toast.error("Please paste valid SQL DDL statements");
+      return;
+    }
+    setPlaygroundInitialSQL(pastedSQL.trim());
+    setShowPasteModal(false);
+    setPastedSQL("");
+    toast.success("Schema connected to AI Copilot!");
+  };
 
   const clearResults = () => {
     setStatus("idle"); setError("");
@@ -470,8 +483,19 @@ export default function AssistantPage({ onNavigate }: { onNavigate: (p: string) 
         setChatHistory(prev => [...prev, assistantMsg]);
         setStatus("idle");
       } catch (err: unknown) {
-        setError((err as Error).message ?? "Something went wrong");
-        setStatus("error");
+        // Fallback to local schema-aware response engine when API fails or key is invalid
+        const parsed = parseSQLSchema(schema);
+        const mock = generateSchemaAwareMockResponse(question, parsed);
+        const assistantMsg: ChatMessage = {
+          id: (Date.now() + 1).toString(),
+          role: "assistant",
+          content: mock.prose,
+          sql: mock.sql,
+          timestamp: Date.now(),
+        };
+        setChatHistory(prev => [...prev, assistantMsg]);
+        setStatus("idle");
+        toast.error("Mistral API Key invalid/unconfigured. Falling back to local schema engine.", { duration: 4000 });
       }
       return;
     }
@@ -496,10 +520,24 @@ export default function AssistantPage({ onNavigate }: { onNavigate: (p: string) 
 
       setStatus("done");
     } catch (err: unknown) {
-      setError((err as Error).message ?? "Something went wrong");
-      setStatus("error");
+      const parsed = parseSQLSchema(schema);
+      const mock = generateSchemaAwareMockResponse(question, parsed);
+
+      if (mode === "explain") {
+        setExplanation(mock.prose);
+        setStatus("done");
+      } else if (mode === "generate") {
+        setGeneratedSQL(mock.sql || "SELECT * FROM example_table;");
+        setStatus("done");
+      } else if (mode === "analyze") {
+        runLocalAnalysis();
+      } else {
+        setError((err as Error).message ?? "Something went wrong");
+        setStatus("error");
+      }
+      toast.error("Mistral API Key invalid/unconfigured. Falling back to local schema engine.", { duration: 4000 });
     }
-  }, [mode, input, schema, schemaContext]);
+  }, [mode, input, schema, schemaContext, runLocalAnalysis]);
 
   const openInPlayground = (sql: string) => {
     setPlaygroundInitialSQL(sql);
@@ -508,14 +546,12 @@ export default function AssistantPage({ onNavigate }: { onNavigate: (p: string) 
 
   // Quick action handler — runs immediately with explicit mode + input, no stale closure
   const runQuickAction = (action: typeof QUICK_ACTIONS[number]) => {
-    // Always switch to the target mode and clear first
     setMode(action.mode);
     setStatus("idle"); setError("");
     setExplanation(""); setGeneratedSQL(""); setFindings([]);
     setLocalAnalysis(null); setLocalAnalysisStatus("idle");
 
     if (action.mode === "analyze") {
-      // "Check Normalization" → run local analysis immediately (no API)
       if (!schema) { toast.error("No schema loaded."); return; }
       const result = analyzeSchema(schema);
       setLocalAnalysis(result);
@@ -524,44 +560,12 @@ export default function AssistantPage({ onNavigate }: { onNavigate: (p: string) 
     }
 
     if (action.mode === "generate") {
-      setInput(""); // let user fill in their own request
+      setInput("");
       return;
     }
 
     if (action.mode === "chat" && action.input) {
-      // Send the prefilled question directly — bypass input state entirely
-      const question = action.input;
-      const userMsg: ChatMessage = {
-        id: Date.now().toString(),
-        role: "user",
-        content: question,
-        timestamp: Date.now(),
-      };
-      setChatHistory(prev => [...prev, userMsg]);
-      setStatus("loading");
-
-      fetch("/api/assistant", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ mode: "chat", input: question, schema, schemaContext }),
-      })
-        .then(r => r.json())
-        .then(data => {
-          if (data.error) throw new Error(data.error);
-          const { prose, sql: sqlOut } = extractSQLFromAnswer(data.answer ?? "");
-          setChatHistory(prev => [...prev, {
-            id: (Date.now() + 1).toString(),
-            role: "assistant",
-            content: prose,
-            sql: sqlOut || undefined,
-            timestamp: Date.now(),
-          }]);
-          setStatus("idle");
-        })
-        .catch(err => {
-          setError(err.message ?? "Something went wrong");
-          setStatus("error");
-        });
+      handleRun(action.input);
     }
   };
 
@@ -573,19 +577,19 @@ export default function AssistantPage({ onNavigate }: { onNavigate: (p: string) 
   ];
 
   return (
-    <div className="max-w-3xl mx-auto space-y-5 pb-10">
+    <div className="w-full max-w-6xl mx-auto space-y-6 pb-10 px-2 sm:px-4">
 
       {/* ── Header ─────────────────────────────────────────────────────────── */}
       <div className="flex items-start justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-bold text-[var(--text)]">AI Database Assistant</h1>
-          <p className="text-sm text-[var(--text-muted)] mt-0.5">
+          <h1 className="text-3xl font-extrabold text-[var(--text)] tracking-tight">AI Database Assistant</h1>
+          <p className="text-base text-[var(--text-muted)] mt-1">
             Ask questions, explain queries, generate SQL, or analyze your schema.
           </p>
         </div>
-        <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl border text-xs font-semibold flex-shrink-0"
+        <div className="flex items-center gap-2 px-4 py-2 rounded-xl border text-sm font-semibold flex-shrink-0"
           style={{ background: "var(--primary-light)", color: "var(--primary)", borderColor: "var(--primary-border, rgba(37,99,235,0.25))" }}>
-          <Bot size={12} /> Mistral AI
+          <Bot size={15} /> Mistral AI
         </div>
       </div>
 
@@ -597,46 +601,116 @@ export default function AssistantPage({ onNavigate }: { onNavigate: (p: string) 
         ))}
       </div>
 
-      {/* ── Schema context banner ───────────────────────────────────────────── */}
+      {/* ── Copilot Context banner ───────────────────────────────────────────── */}
       {schema ? (
-        <div className="flex items-center gap-2.5 px-4 py-2.5 rounded-xl border text-xs"
+        <div className="flex items-center justify-between gap-3 px-5 py-3 rounded-xl border text-sm font-medium"
           style={{ background: "var(--surface)", borderColor: "var(--border)", color: "var(--text-muted)" }}>
-          <CheckCircle2 size={13} className="text-emerald-500 flex-shrink-0" />
-          <span>
-            Schema loaded
-            {activeProject ? ` — ${activeProject.name}` : " — Playground"}
-            {tableCount > 0 && ` (${tableCount} table${tableCount !== 1 ? "s" : ""})`}
-          </span>
-          {activeProject && (
-            <span className="ml-auto font-mono text-[10px] px-2 py-0.5 rounded-md"
-              style={{ background: "var(--card)", border: "1px solid var(--border)" }}>
-              {activeProject.dbType}
-            </span>
-          )}
+          <div className="flex items-center gap-3">
+            <span className={cn(
+              "w-2.5 h-2.5 rounded-full flex-shrink-0",
+              copilotContext?.source === "playground"
+                ? "bg-blue-500 shadow-[0_0_8px_rgba(59,130,246,0.5)]"
+                : copilotContext?.source === "er-diagram"
+                ? "bg-purple-500 shadow-[0_0_8px_rgba(168,85,247,0.5)]"
+                : "bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.5)]"
+            )} />
+            <div className="flex items-center gap-2 flex-wrap">
+              <span className="font-bold text-[var(--text)]">
+                {copilotContext?.source === "playground"
+                  ? "Context: SQL Playground"
+                  : copilotContext?.source === "er-diagram"
+                  ? "Context: ER Diagram"
+                  : `Schema loaded ${activeProject ? `— ${activeProject.name}` : "— Playground"}`}
+              </span>
+              {tableCount > 0 && (
+                <span className="text-xs text-[var(--text-subtle)]">({tableCount} table{tableCount !== 1 ? "s" : ""})</span>
+              )}
+              {copilotContext?.selectedLinesCount && copilotContext.selectedLinesCount > 0 ? (
+                <span className="px-2.5 py-0.5 rounded-md text-xs font-mono bg-blue-500/10 text-blue-600 dark:text-blue-400 border border-blue-500/20 font-bold">
+                  Selected SQL: {copilotContext.selectedLinesCount} line{copilotContext.selectedLinesCount > 1 ? "s" : ""}
+                </span>
+              ) : null}
+            </div>
+          </div>
+
+          <div className="flex items-center gap-2 flex-shrink-0">
+            {projects.length > 0 && (
+              <select
+                value={activeProjectId || ""}
+                onChange={(e) => setActiveProject(e.target.value || null)}
+                className="px-3 py-1.5 rounded-lg border text-xs font-semibold bg-[var(--card)] text-[var(--text)] border-[var(--border)] outline-none cursor-pointer hover:border-[var(--primary)] transition-all"
+              >
+                <option value="">Switch Project...</option>
+                {projects.map((p) => (
+                  <option key={p.id} value={p.id}>{p.name} ({p.dbType})</option>
+                ))}
+              </select>
+            )}
+            <button
+              onClick={() => setShowPasteModal(true)}
+              className="px-3 py-1.5 rounded-lg border text-xs font-semibold bg-[var(--card)] text-[var(--primary)] border-[var(--primary-border,rgba(37,99,235,0.3))] hover:bg-[var(--primary-light)] transition-all cursor-pointer flex items-center gap-1.5"
+            >
+              <FileCode size={13} /> Paste Schema
+            </button>
+          </div>
         </div>
       ) : (
-        <div className="flex items-center gap-2.5 px-4 py-2.5 rounded-xl border text-xs"
-          style={{ background: "var(--surface)", borderColor: "var(--border)", color: "var(--text-subtle)" }}>
-          <AlertTriangle size={13} className="text-amber-500 flex-shrink-0" />
-          <span>No schema loaded. Open a project or write SQL in the Playground first.</span>
-          <button onClick={() => onNavigate("projects")}
-            className="ml-auto flex items-center gap-1 text-[var(--primary)] font-semibold hover:underline flex-shrink-0">
-            Projects <ChevronRight size={11} />
-          </button>
+        <div className="rounded-xl border p-5 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4"
+          style={{ background: "var(--surface)", borderColor: "var(--border)", color: "var(--text-muted)" }}>
+          <div className="flex items-start gap-3">
+            <AlertTriangle size={18} className="text-amber-500 flex-shrink-0 mt-0.5" />
+            <div>
+              <p className="text-sm font-bold text-[var(--text)]">No database schema currently loaded</p>
+              <p className="text-xs text-[var(--text-muted)] mt-0.5">
+                Select an existing project, paste SQL DDL statements, or create a new project.
+              </p>
+            </div>
+          </div>
+
+          <div className="flex items-center gap-2.5 flex-wrap flex-shrink-0 w-full sm:w-auto">
+            {projects.length > 0 && (
+              <select
+                value={activeProjectId || ""}
+                onChange={(e) => setActiveProject(e.target.value || null)}
+                className="px-3.5 py-2 rounded-xl border text-xs font-semibold bg-[var(--card)] text-[var(--text)] border-[var(--border)] outline-none cursor-pointer hover:border-[var(--primary)] transition-all"
+              >
+                <option value="">-- Select Project --</option>
+                {projects.map((p) => (
+                  <option key={p.id} value={p.id}>
+                    {p.name} ({p.dbType})
+                  </option>
+                ))}
+              </select>
+            )}
+
+            <button
+              onClick={() => setShowPasteModal(true)}
+              className="px-3.5 py-2 rounded-xl border text-xs font-semibold bg-[var(--card)] text-[var(--primary)] border-[var(--primary-border,rgba(37,99,235,0.3))] hover:bg-[var(--primary-light)] transition-all cursor-pointer flex items-center gap-1.5"
+            >
+              <FileCode size={13} /> Paste Schema
+            </button>
+
+            <button
+              onClick={() => onNavigate("projects")}
+              className="btn-primary text-xs px-3.5 py-2 rounded-xl font-semibold flex items-center gap-1.5 cursor-pointer"
+            >
+              <Plus size={13} /> Add Project
+            </button>
+          </div>
         </div>
       )}
 
       {/* ── Quick Actions ──────────────────────────────────────────────────── */}
       <div>
-        <p className="text-[10px] font-bold uppercase tracking-widest text-[var(--text-subtle)] mb-2 flex items-center gap-1.5">
-          <Zap size={10} /> Quick Actions
+        <p className="text-xs font-bold uppercase tracking-widest text-[var(--text-subtle)] mb-2.5 flex items-center gap-1.5">
+          <Zap size={12} /> Copilot Quick Actions
         </p>
-        <div className="flex items-center gap-2 flex-wrap">
-          {QUICK_ACTIONS.map(a => (
+        <div className="flex items-center gap-2.5 flex-wrap">
+          {copilotQuickActions.map((a: { label: string; mode: Mode; input: string }) => (
             <button key={a.label} onClick={() => runQuickAction(a)}
-              className="px-3 py-1.5 rounded-xl text-xs font-semibold border border-[var(--border)]
+              className="px-4 py-2 rounded-xl text-sm font-semibold border border-[var(--border)]
                 bg-[var(--card)] text-[var(--text-muted)] hover:text-[var(--primary)]
-                hover:border-[var(--primary)]/40 transition-all">
+                hover:border-[var(--primary)]/40 transition-all cursor-pointer">
               {a.label}
             </button>
           ))}
@@ -661,40 +735,62 @@ export default function AssistantPage({ onNavigate }: { onNavigate: (p: string) 
                   <Trash2 size={11} /> Clear
                 </button>
               </div>
-              <div className="p-4 space-y-4 max-h-[420px] overflow-y-auto">
+              <div className="p-5 space-y-4 min-h-[440px] max-h-[620px] overflow-y-auto">
                 {chatHistory.map(msg => (
                   <div key={msg.id} className={cn("flex gap-3", msg.role === "user" ? "justify-end" : "justify-start")}>
                     {msg.role === "assistant" && (
-                      <div className="w-7 h-7 rounded-lg flex-shrink-0 flex items-center justify-center mt-0.5"
+                      <div className="w-8 h-8 rounded-lg flex-shrink-0 flex items-center justify-center mt-0.5"
                         style={{ background: "var(--primary-light)" }}>
-                        <Bot size={13} style={{ color: "var(--primary)" }} />
+                        <Bot size={15} style={{ color: "var(--primary)" }} />
                       </div>
                     )}
                     <div className={cn("max-w-[85%] space-y-2", msg.role === "user" ? "items-end" : "items-start")}>
-                      <div className={cn(
-                        "px-3.5 py-2.5 rounded-2xl text-sm leading-relaxed",
-                        msg.role === "user"
-                          ? "rounded-tr-sm text-white"
-                          : "rounded-tl-sm text-[var(--text)] bg-[var(--surface)] border border-[var(--border)]"
-                      )} style={msg.role === "user" ? { background: "var(--primary)" } : {}}>
-                        <p className="whitespace-pre-wrap">{msg.content}</p>
-                      </div>
-                      {msg.sql && (
-                        <SQLBlock sql={msg.sql} onOpenPlayground={openInPlayground} />
+                      {msg.role === "user" ? (
+                        <div className="px-4 py-3 rounded-2xl rounded-tr-sm text-white text-base leading-relaxed" style={{ background: "var(--primary)" }}>
+                          <p className="whitespace-pre-wrap">{msg.content}</p>
+                        </div>
+                      ) : (
+                        <div className="space-y-2 w-full">
+                          {msg.content.toLowerCase().includes("purpose") ||
+                          msg.content.toLowerCase().includes("tables involved") ||
+                          msg.content.toLowerCase().includes("join explanation") ? (
+                            <ExplanationResponseCard rawText={msg.content} />
+                          ) : (
+                            <>
+                              <div className="px-4 py-3 rounded-2xl rounded-tl-sm text-[var(--text)] bg-[var(--surface)] border border-[var(--border)] text-base leading-relaxed">
+                                <p className="whitespace-pre-wrap">{msg.content}</p>
+                              </div>
+                              <div className="flex items-center gap-2 pl-1">
+                                <button
+                                  onClick={() => {
+                                    navigator.clipboard.writeText(msg.content);
+                                    toast.success("Explanation copied!");
+                                  }}
+                                  className="text-xs font-semibold text-[var(--text-subtle)] hover:text-[var(--primary)] flex items-center gap-1 transition-colors cursor-pointer"
+                                >
+                                  <Copy size={12} /> Copy Explanation
+                                </button>
+                              </div>
+                            </>
+                          )}
+                          {msg.sql && (
+                            <SQLResponseCard sql={msg.sql} label="Generated SQL" onOpenPlayground={openInPlayground} />
+                          )}
+                        </div>
                       )}
                     </div>
                     {msg.role === "user" && (
-                      <div className="w-7 h-7 rounded-lg flex-shrink-0 flex items-center justify-center mt-0.5 bg-[var(--primary)]">
-                        <span className="text-[10px] font-bold text-white">You</span>
+                      <div className="w-8 h-8 rounded-lg flex-shrink-0 flex items-center justify-center mt-0.5 bg-[var(--primary)]">
+                        <span className="text-xs font-bold text-white">You</span>
                       </div>
                     )}
                   </div>
                 ))}
                 {status === "loading" && (
                   <div className="flex gap-3">
-                    <div className="w-7 h-7 rounded-lg flex-shrink-0 flex items-center justify-center"
+                    <div className="w-8 h-8 rounded-lg flex-shrink-0 flex items-center justify-center"
                       style={{ background: "var(--primary-light)" }}>
-                      <Bot size={13} style={{ color: "var(--primary)" }} />
+                      <Bot size={15} style={{ color: "var(--primary)" }} />
                     </div>
                     <div className="rounded-2xl rounded-tl-sm border border-[var(--border)]"
                       style={{ background: "var(--surface)" }}>
@@ -703,10 +799,10 @@ export default function AssistantPage({ onNavigate }: { onNavigate: (p: string) 
                   </div>
                 )}
                 {status === "error" && (
-                  <div className="flex items-start gap-2 px-3 py-2.5 rounded-xl border border-red-200 dark:border-red-500/20"
+                  <div className="flex items-start gap-2 px-4 py-3 rounded-xl border border-red-200 dark:border-red-500/20"
                     style={{ background: "rgba(220,38,38,0.04)" }}>
-                    <XCircle size={14} className="text-red-500 flex-shrink-0 mt-0.5" />
-                    <p className="text-sm text-red-600 dark:text-red-400">{errorMsg}</p>
+                    <XCircle size={16} className="text-red-500 flex-shrink-0 mt-0.5" />
+                    <p className="text-base text-red-600 dark:text-red-400">{errorMsg}</p>
                   </div>
                 )}
                 <div ref={chatEndRef} />
@@ -716,10 +812,10 @@ export default function AssistantPage({ onNavigate }: { onNavigate: (p: string) 
 
           {/* Empty state — only when no history AND not loading */}
           {chatHistory.length === 0 && status !== "loading" && (
-            <div className="card p-8 text-center">
-              <Bot size={28} className="mx-auto mb-3 text-[var(--primary)] opacity-70" />
-              <p className="text-sm font-semibold text-[var(--text)]">Ask anything about your database</p>
-              <p className="text-xs text-[var(--text-muted)] mt-1">
+            <div className="card p-12 md:p-16 text-center min-h-[320px] flex flex-col items-center justify-center">
+              <Bot size={38} className="mx-auto mb-4 text-[var(--primary)] opacity-75" />
+              <p className="text-lg font-bold text-[var(--text)]">Ask anything about your database</p>
+              <p className="text-sm text-[var(--text-muted)] mt-2 max-w-md mx-auto leading-relaxed">
                 {schema
                   ? "Your schema is loaded. Try the quick actions above or type your own question."
                   : "Load a schema first, then ask me anything about your database design."}
@@ -728,23 +824,23 @@ export default function AssistantPage({ onNavigate }: { onNavigate: (p: string) 
           )}
 
           {/* Input */}
-          <div className="flex gap-2">
+          <div className="flex gap-3">
             <input
               value={input}
               onChange={e => setInput(e.target.value)}
               onKeyDown={e => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); handleRun(); } }}
               placeholder={schema ? "Ask a question about your database…" : "Load a schema to start chatting…"}
               disabled={status === "loading"}
-              className="flex-1 rounded-xl border border-[var(--border)] bg-[var(--card)] text-[var(--text)] text-sm
+              className="flex-1 rounded-xl border border-[var(--border)] bg-[var(--card)] text-[var(--text)] text-base
                 placeholder:text-[var(--text-subtle)] focus:outline-none focus:ring-2 focus:ring-[var(--primary)]/25
-                focus:border-[var(--primary)] transition-all px-4 py-2.5 disabled:opacity-50"
+                focus:border-[var(--primary)] transition-all px-4 py-3 disabled:opacity-50"
             />
             <button onClick={() => handleRun()} disabled={status === "loading" || !input.trim()}
-              className="btn-primary px-4 py-2.5 disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-1.5">
-              {status === "loading" ? <Loader2 size={14} className="animate-spin" /> : <Send size={14} />}
+              className="btn-primary px-5 py-3 disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2 text-base font-semibold">
+              {status === "loading" ? <Loader2 size={16} className="animate-spin" /> : <Send size={16} />}
             </button>
           </div>
-          <p className="text-[10px] text-[var(--text-subtle)]">Press Enter to send · Shift+Enter for new line</p>
+          <p className="text-xs text-[var(--text-subtle)]">Press Enter to send · Shift+Enter for new line</p>
         </div>
       )}
 
@@ -752,12 +848,12 @@ export default function AssistantPage({ onNavigate }: { onNavigate: (p: string) 
       {/* EXPLAIN MODE                                                         */}
       {/* ════════════════════════════════════════════════════════════════════ */}
       {mode === "explain" && (
-        <div className="space-y-3">
-          <label className="text-xs font-semibold text-[var(--text-muted)] uppercase tracking-widest">SQL Query</label>
+        <div className="space-y-4">
+          <label className="text-xs font-bold text-[var(--text-muted)] uppercase tracking-widest">SQL Query</label>
           <textarea value={input} onChange={e => setInput(e.target.value)}
             placeholder="Paste the SQL query you want explained…"
-            rows={6}
-            className="w-full rounded-xl border border-[var(--border)] bg-[var(--card)] text-[var(--text)] text-sm
+            rows={9}
+            className="w-full rounded-xl border border-[var(--border)] bg-[var(--card)] text-[var(--text)] text-base
               placeholder:text-[var(--text-subtle)] focus:outline-none focus:ring-2 focus:ring-[var(--primary)]/25
               focus:border-[var(--primary)] transition-all resize-y p-4 font-mono leading-relaxed"
           />
@@ -778,13 +874,7 @@ export default function AssistantPage({ onNavigate }: { onNavigate: (p: string) 
             </div>
           )}
           {status === "done" && explanation && (
-            <div className="card p-5 space-y-3">
-              <div className="flex items-center gap-2">
-                <Search size={13} className="text-[var(--primary)]" />
-                <span className="text-xs font-bold uppercase tracking-widest text-[var(--text-subtle)]">Explanation</span>
-              </div>
-              <p className="text-sm text-[var(--text)] leading-relaxed whitespace-pre-wrap">{explanation}</p>
-            </div>
+            <ExplanationResponseCard rawText={explanation} />
           )}
         </div>
       )}
@@ -793,12 +883,12 @@ export default function AssistantPage({ onNavigate }: { onNavigate: (p: string) 
       {/* GENERATE MODE                                                        */}
       {/* ════════════════════════════════════════════════════════════════════ */}
       {mode === "generate" && (
-        <div className="space-y-3">
-          <label className="text-xs font-semibold text-[var(--text-muted)] uppercase tracking-widest">Your Request</label>
+        <div className="space-y-4">
+          <label className="text-xs font-bold text-[var(--text-muted)] uppercase tracking-widest">Your Request</label>
           <textarea value={input} onChange={e => setInput(e.target.value)}
             placeholder={"Describe what you want in plain English.\n\nExample: Find all users who registered after January 2025."}
-            rows={4}
-            className="w-full rounded-xl border border-[var(--border)] bg-[var(--card)] text-[var(--text)] text-sm
+            rows={7}
+            className="w-full rounded-xl border border-[var(--border)] bg-[var(--card)] text-[var(--text)] text-base
               placeholder:text-[var(--text-subtle)] focus:outline-none focus:ring-2 focus:ring-[var(--primary)]/25
               focus:border-[var(--primary)] transition-all resize-y p-4 leading-relaxed"
           />
@@ -828,13 +918,13 @@ export default function AssistantPage({ onNavigate }: { onNavigate: (p: string) 
       {/* ANALYZE MODE                                                         */}
       {/* ════════════════════════════════════════════════════════════════════ */}
       {mode === "analyze" && (
-        <div className="space-y-4">
+        <div className="space-y-5">
           {/* Schema preview */}
           <div className="space-y-2">
-            <label className="text-xs font-semibold text-[var(--text-muted)] uppercase tracking-widest">Schema Preview</label>
+            <label className="text-xs font-bold text-[var(--text-muted)] uppercase tracking-widest">Schema Preview</label>
             {schema ? (
               <pre className="w-full rounded-xl border border-[var(--border)] bg-[var(--card)] text-[var(--text-subtle)]
-                text-xs font-mono p-4 overflow-auto leading-relaxed" style={{ maxHeight: 160 }}>
+                text-sm font-mono p-4 overflow-auto leading-relaxed" style={{ maxHeight: 260 }}>
                 {schema.slice(0, 1200)}{schema.length > 1200 ? "\n… (truncated)" : ""}
               </pre>
             ) : (
@@ -910,21 +1000,31 @@ export default function AssistantPage({ onNavigate }: { onNavigate: (p: string) 
                   (["issue","warning","good"] as FindingItem["level"][]).indexOf(b.level)
                 )
                 .map((f, i) => {
-                  const cfg = FINDING_CONFIG[f.level] ?? FINDING_CONFIG.warning;
-                  const Icon = cfg.icon;
+                  const extractedSql = f.detail.match(/(CREATE|ALTER|DROP|SELECT|INSERT|UPDATE|DELETE|ADD CONSTRAINT)[\s\S]+/i)?.[0];
+                  if (f.level === "good") {
+                    return (
+                      <AISuggestionCard
+                        key={i}
+                        title={f.title}
+                        suggestion={f.detail}
+                        reason="Validated structural pattern in database schema design."
+                        expectedBenefit="Ensures optimal query execution and schema normalization."
+                        sqlFix={extractedSql}
+                        onOpenPlayground={openInPlayground}
+                      />
+                    );
+                  }
                   return (
-                    <div key={i} className={cn("card p-4 border", cfg.bg, cfg.border)}>
-                      <div className="flex items-start gap-3">
-                        <Icon size={14} className={cn("flex-shrink-0 mt-0.5", cfg.color)} />
-                        <div className="min-w-0 flex-1">
-                          <p className={cn("text-sm font-semibold", cfg.color)}>{f.title}</p>
-                          <p className="text-xs text-[var(--text-muted)] mt-0.5 leading-relaxed">{f.detail}</p>
-                        </div>
-                        <span className={cn("ml-auto flex-shrink-0 text-[9px] font-bold px-2 py-0.5 rounded-full border whitespace-nowrap", cfg.color, cfg.border, cfg.bg)}>
-                          {cfg.label}
-                        </span>
-                      </div>
-                    </div>
+                    <SchemaIssueCard
+                      key={i}
+                      title={f.title}
+                      severity={f.level === "issue" ? "error" : "warning"}
+                      explanation={f.detail}
+                      whyItMatters="Identified during AI deep architectural analysis of the schema."
+                      suggestedSolution="Apply recommended SQL fixes or structural modifications."
+                      sqlFix={extractedSql}
+                      onOpenPlayground={openInPlayground}
+                    />
                   );
                 })}
             </div>
@@ -934,6 +1034,53 @@ export default function AssistantPage({ onNavigate }: { onNavigate: (p: string) 
               No AI findings returned. Try providing a more complete schema.
             </div>
           )}
+        </div>
+      )}
+    {/* ── Paste Schema Modal ─────────────────────────────────────────────────── */}
+      {showPasteModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-xs">
+          <div className="card w-full max-w-xl p-6 space-y-4 shadow-2xl relative">
+            <div className="flex items-center justify-between border-b border-[var(--border)] pb-3">
+              <div className="flex items-center gap-2">
+                <FileCode size={18} className="text-[var(--primary)]" />
+                <h3 className="text-base font-bold text-[var(--text)]">Paste Database Schema</h3>
+              </div>
+              <button
+                onClick={() => setShowPasteModal(false)}
+                className="p-1 rounded-lg text-[var(--text-subtle)] hover:text-[var(--text)] hover:bg-[var(--surface)] transition-colors cursor-pointer"
+              >
+                <X size={16} />
+              </button>
+            </div>
+
+            <p className="text-xs text-[var(--text-muted)] leading-relaxed">
+              Paste your SQL DDL statements (e.g. <code className="font-mono text-[var(--primary)]">CREATE TABLE ...</code>) below to instantly connect schema context to the AI Copilot.
+            </p>
+
+            <textarea
+              value={pastedSQL}
+              onChange={(e) => setPastedSQL(e.target.value)}
+              placeholder={`CREATE TABLE users (\n  id SERIAL PRIMARY KEY,\n  name VARCHAR(120) NOT NULL,\n  email VARCHAR(255) NOT NULL UNIQUE\n);`}
+              rows={8}
+              className="w-full rounded-xl border border-[var(--border)] bg-[var(--surface)] text-[var(--text)] text-xs font-mono p-4 focus:outline-none focus:ring-2 focus:ring-[var(--primary)]/25 focus:border-[var(--primary)] transition-all resize-y leading-relaxed"
+            />
+
+            <div className="flex items-center justify-end gap-2 pt-3 border-t border-[var(--border)]">
+              <button
+                onClick={() => setShowPasteModal(false)}
+                className="btn-ghost text-xs px-4 py-2"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleConnectPastedSchema}
+                disabled={!pastedSQL.trim()}
+                className="btn-primary text-xs px-4 py-2 disabled:opacity-50"
+              >
+                Connect Schema
+              </button>
+            </div>
+          </div>
         </div>
       )}
     </div>

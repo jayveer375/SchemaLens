@@ -305,3 +305,79 @@ export function analyzeSchema(sql: string): AnalysisResult {
     fkCount,
   };
 }
+
+/** Generate schema-aware response when AI backend API key is missing or fails */
+export function generateSchemaAwareMockResponse(
+  question: string,
+  schema: Schema
+): { prose: string; sql?: string } {
+  const q = question.toLowerCase();
+  const hasSchema = schema.tables.length > 0;
+
+  if (!hasSchema) {
+    return {
+      prose:
+        "Query Purpose: General SQL & Database Design Assistant\n\nNo database schema is currently connected. Once you load a project with DDL files or write SQL in the Playground, I will provide schema-specific analysis.",
+      sql: `-- General SQL Query Example\nSELECT \n  id, \n  name, \n  created_at \nFROM example_table \nWHERE status = 'active';`,
+    };
+  }
+
+  const tableNames = schema.tables.map((t) => t.name).join(", ");
+
+  if (q.includes("explain") || q.includes("schema") || q.includes("database")) {
+    const tableBreakdown = schema.tables
+      .map((t) => {
+        const pk = t.columns.filter((c) => c.isPrimaryKey).map((c) => c.name).join(", ") || "None";
+        const fks = t.columns.filter((c) => c.isForeignKey).map((c) => `${c.name} → ${c.references?.table}`).join(", ") || "None";
+        return `- **\`${t.name}\`** (${t.columns.length} columns)\n  - Primary Key: \`${pk}\`\n  - Foreign Keys: ${fks}`;
+      })
+      .join("\n");
+
+    const sampleTable = schema.tables[0];
+    const sampleCols = sampleTable.columns.slice(0, 3).map((c) => c.name).join(", ");
+
+    return {
+      prose: `Query Purpose: Connected Database Schema Overview\n\nTables Involved: \`${tableNames}\`\n\nYour database contains **${schema.tables.length} table${schema.tables.length !== 1 ? "s" : ""}** and **${schema.relationships.length} relationship${schema.relationships.length !== 1 ? "s" : ""}**:\n\n${tableBreakdown}`,
+      sql: `SELECT \n  ${sampleCols}\nFROM ${sampleTable.name}\nLIMIT 10;`,
+    };
+  }
+
+  if (q.includes("relationship") || q.includes("foreign key") || q.includes("connect")) {
+    if (schema.relationships.length === 0) {
+      return {
+        prose: `Query Purpose: Schema Relationships Analysis\n\nTables Involved: \`${tableNames}\`\n\nJOIN Explanation: Currently, **no explicit foreign key relationships** were detected between your connected tables (${tableNames}).\n\nPerformance Notes: Add \`FOREIGN KEY\` constraints between matching ID fields to maintain referential integrity and speed up joins.`,
+        sql: schema.tables.length >= 2
+          ? `ALTER TABLE ${schema.tables[1].name}\n  ADD CONSTRAINT fk_${schema.tables[1].name}_ref\n  FOREIGN KEY (${schema.tables[1].columns[0]?.name || "id"}) REFERENCES ${schema.tables[0].name}(id);`
+          : undefined,
+      };
+    }
+
+    const relList = schema.relationships
+      .map((r) => `- **\`${r.fromTable}.${r.fromColumn}\`** → **\`${r.toTable}.${r.toColumn}\`** (${r.cardinality})`)
+      .join("\n");
+
+    const firstRel = schema.relationships[0];
+
+    return {
+      prose: `Query Purpose: Active Database Relationships Analysis\n\nTables Involved: \`${tableNames}\`\n\nJOIN Explanation:\n${relList}\n\nPerformance Notes: Foreign key columns are indexed for optimal JOIN speed.`,
+      sql: `SELECT \n  a.*,\n  b.*\nFROM ${firstRel.fromTable} a\nJOIN ${firstRel.toTable} b ON a.${firstRel.fromColumn} = b.${firstRel.toColumn};`,
+    };
+  }
+
+  if (q.includes("find") || q.includes("query") || q.includes("how can i") || q.includes("index")) {
+    const mainTable = schema.tables[0];
+    const firstCol = mainTable.columns[0]?.name || "id";
+    const secondCol = mainTable.columns[1]?.name || "name";
+
+    return {
+      prose: `Query Purpose: Query optimization and index recommendation for \`${mainTable.name}\` table.\n\nTables Involved: \`${mainTable.name}\`\n\nFiltering: Filters non-null \`${firstCol}\` values ordered descending.\n\nPerformance Notes: Ensure an index exists on \`${mainTable.name}(${firstCol})\`.`,
+      sql: `SELECT \n  ${firstCol},\n  ${secondCol}\nFROM ${mainTable.name}\nWHERE ${firstCol} IS NOT NULL\nORDER BY ${firstCol} DESC;`,
+    };
+  }
+
+  const primaryTable = schema.tables[0].name;
+  return {
+    prose: `Query Purpose: Database Schema Analysis for question "${question}"\n\nTables Involved: \`${tableNames}\`\n\nConnected Context: Provided schema contains ${schema.tables.length} tables (${tableNames}).\n\nPerformance Notes: Ensure indexes exist on primary and foreign key columns.`,
+    sql: `SELECT * FROM ${primaryTable} LIMIT 10;`,
+  };
+}

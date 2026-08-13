@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import "lenis/dist/lenis.css";
 import "./globals.css";
 import { Toaster } from "react-hot-toast";
 import Providers from "./providers";

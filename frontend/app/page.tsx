@@ -27,6 +27,7 @@ import PlaygroundPage from "@/app/playground/page";
 import AssistantPage from "@/components/pages/AssistantPage";
 import ProfilePage from "@/components/pages/ProfilePage";
 import UsagePage from "@/components/pages/UsagePage";
+import AIAssistantPanel from "@/components/AIAssistantPanel";
 
 import { useStore } from "@/lib/store";
 import dynamic from "next/dynamic";
@@ -180,6 +181,8 @@ export default function RootPage() {
           </button>
         ))}
       </nav>
+
+      <AIAssistantPanel />
     </div>
   );
 }

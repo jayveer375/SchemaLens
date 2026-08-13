@@ -1,6 +1,6 @@
 import { create } from "zustand";
 import { persist } from "zustand/middleware";
-import type { User, Project, ProjectFile, ActivityLog, AdminUser, QuickConvertResult, Subscription } from "./types";
+import type { User, Project, ProjectFile, ActivityLog, AdminUser, QuickConvertResult, Subscription, PlanId } from "./types";
 import { defaultSubscription, maybeResetMonthly, incrementAIGenerations as incrementAIGenerationsSub } from "./subscription";
 
 export interface AnalysisResult {
@@ -53,6 +53,7 @@ interface SubscriptionSlice {
   subscription: Subscription;
   setSubscription: (s: Subscription) => void;
   upgradeToPro: () => void;
+  upgradeToPlan: (planId: PlanId) => void;
   incrementConversions: () => void;
   incrementAIGenerations: (amount?: number) => void;
   getSubscription: () => Subscription; // always fresh (resets if new month)
@@ -157,6 +158,21 @@ export const useStore = create<Store>()(
       // ── Subscription ────────────────────────────────────────────────────────
       subscription: defaultSubscription(),
       setSubscription: (subscription) => set({ subscription }),
+      upgradeToPlan: (planId) =>
+        set((state) => {
+          const upgraded = {
+            ...state.subscription,
+            planId,
+            startedAt: Date.now(),
+            renewsAt: Date.now() + 30 * 24 * 60 * 60 * 1000,
+          };
+          return {
+            subscription: upgraded,
+            user: state.user
+              ? { ...state.user, subscription: upgraded }
+              : state.user,
+          };
+        }),
       upgradeToPro: () =>
         set((state) => {
           const upgraded = {

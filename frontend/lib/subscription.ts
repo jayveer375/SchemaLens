@@ -30,6 +30,20 @@ export const PLANS: Record<PlanId, Plan> = {
     advancedExport: true,
     support: "priority",
   },
+  ultimate: {
+    id: "ultimate",
+    name: "Ultimate",
+    price: 699,
+    conversionsPerMonth: 999999, // Unlimited conversions
+    maxProjects: 999999,        // Unlimited projects
+    maxImagesPerProject: 999999, // Unlimited images
+    aiGenerationsPerMonth: 999999, // Unlimited AI credits
+    zipExport: true,
+    priorityQueue: true,
+    versionHistory: true,
+    advancedExport: true,
+    support: "priority",
+  },
 };
 
 // ── Get current month key ─────────────────────────────────────────────────────
@@ -62,22 +76,26 @@ export function maybeResetMonthly(sub: Subscription): Subscription {
 
 // ── Usage check helpers ───────────────────────────────────────────────────────
 export function canConvert(sub: Subscription): boolean {
+  if (sub.planId === "ultimate") return true;
   const s = maybeResetMonthly(sub);
   const plan = PLANS[s.planId];
   return s.conversionsUsedThisMonth < (s.conversionLimitOverride ?? plan.conversionsPerMonth);
 }
 
 export function canCreateProject(sub: Subscription, currentCount: number): boolean {
+  if (sub.planId === "ultimate") return true;
   const plan = PLANS[sub.planId];
   return currentCount < (sub.projectLimitOverride ?? plan.maxProjects);
 }
 
 export function canAddImage(sub: Subscription, currentCount: number): boolean {
+  if (sub.planId === "ultimate") return true;
   const plan = PLANS[sub.planId];
   return currentCount < (sub.imageLimitOverride ?? plan.maxImagesPerProject);
 }
 
 export function conversionsLeft(sub: Subscription): number {
+  if (sub.planId === "ultimate") return 999999;
   const s = maybeResetMonthly(sub);
   const plan = PLANS[s.planId];
   return Math.max(0, (s.conversionLimitOverride ?? plan.conversionsPerMonth) - s.conversionsUsedThisMonth);
@@ -93,11 +111,11 @@ export function effectiveLimits(sub: Subscription) {
 }
 
 export function getPlan(sub: Subscription): Plan {
-  return PLANS[sub.planId];
+  return PLANS[sub.planId] ?? PLANS.free;
 }
 
 export function canUsePlayground(sub: Subscription): boolean {
-  return sub.planId === "pro";
+  return sub.planId === "pro" || sub.planId === "ultimate";
 }
 
 // ── AI Generation credits helpers ───────────────────────────────────────────────
@@ -111,11 +129,13 @@ export function getQuestionCreditCost(input: string, mode?: string): number {
 }
 
 export function canGenerateAI(sub: Subscription, requiredAmount: number = 5): boolean {
+  if (sub.planId === "ultimate") return true;
   const left = aiGenerationsLeft(sub);
   return left >= requiredAmount;
 }
 
 export function aiGenerationsLeft(sub: Subscription): number {
+  if (sub.planId === "ultimate") return 999999;
   const s = maybeResetMonthly(sub);
   const plan = PLANS[s.planId];
   const total = s.aiGenerationsLimitOverride ?? plan.aiGenerationsPerMonth;

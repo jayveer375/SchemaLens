@@ -250,29 +250,32 @@ export default function ProfilePage({ onNavigate }: { onNavigate: (p: string) =>
               </div>
               <div className="flex items-center justify-between mb-2">
                 <span className="text-2xl font-bold text-[var(--text)]">
-                  {aiCreditsLeft}
+                  {sub.planId === "ultimate" ? "Unlimited" : aiCreditsLeft}
                 </span>
                 <span className="text-xs text-[var(--text-subtle)]">
-                  / {isPro ? 150 : 50} per month
+                  {sub.planId === "ultimate" ? "No monthly limit" : `/ ${isPro ? 150 : 50} per month`}
                 </span>
               </div>
               <div className="h-2 bg-[var(--surface)] rounded-full overflow-hidden">
                 <div 
-                  className="h-full bg-[var(--primary)] transition-all duration-300"
-                  style={{ width: `${Math.min(100, (aiCreditsLeft / (isPro ? 150 : 50)) * 100)}%` }}
+                  className={cn(
+                    "h-full transition-all duration-300",
+                    sub.planId === "ultimate" ? "bg-gradient-to-r from-purple-500 to-pink-500 w-full" : "bg-[var(--primary)]"
+                  )}
+                  style={sub.planId !== "ultimate" ? { width: `${Math.min(100, (aiCreditsLeft / (isPro ? 150 : 50)) * 100)}%` } : {}}
                 />
               </div>
-              {aiCreditsLeft <= 15 && aiCreditsLeft > 0 && (
+              {sub.planId !== "ultimate" && aiCreditsLeft <= 15 && aiCreditsLeft > 0 && (
                 <p className="text-xs text-amber-500 mt-2 font-medium">
                   Low credits remaining (Small question: 5 credits, Big question: 7 credits).
                 </p>
               )}
-              {aiCreditsLeft === 0 && !isPro && (
+              {sub.planId === "free" && (
                 <button
                   onClick={() => onNavigate("pricing")}
                   className="mt-2 w-full btn-primary text-xs py-2"
                 >
-                  Upgrade to Pro for 150 Credits
+                  Upgrade Plan
                 </button>
               )}
             </div>

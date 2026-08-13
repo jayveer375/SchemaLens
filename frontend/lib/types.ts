@@ -2,7 +2,7 @@
 
 export type UserRole   = "user" | "admin";
 export type FileStatus = "waiting" | "processing" | "completed" | "failed";
-export type PlanId     = "free" | "pro";
+export type PlanId     = "free" | "pro" | "ultimate";
 
 export type DBType =
   | "postgresql" | "mysql" | "sqlite" | "mssql" | "oracle"

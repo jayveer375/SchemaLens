@@ -15,7 +15,7 @@ export async function POST(req: NextRequest) {
   }
 
   try {
-    const { razorpay_order_id, razorpay_payment_id, razorpay_signature, user_id } =
+    const { razorpay_order_id, razorpay_payment_id, razorpay_signature, user_id, plan_purchased, amount } =
       await req.json();
 
     if (!razorpay_order_id || !razorpay_payment_id || !razorpay_signature) {
@@ -42,6 +42,8 @@ export async function POST(req: NextRequest) {
     // ── Signature is valid — record payment + upgrade plan in the database ──────
     if (user_id) {
       try {
+        const plan = plan_purchased ?? "pro";
+        const amtPaise = amount ? Number(amount) * 100 : (plan === "ultimate" ? 69900 : 19900);
         const res = await fetch(`${BACKEND_URL}/payments`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
@@ -50,8 +52,8 @@ export async function POST(req: NextRequest) {
             razorpay_order_id,
             razorpay_payment_id,
             razorpay_signature,
-            amount_paise: 19900,   // ₹199
-            plan_purchased: "pro",
+            amount_paise: amtPaise,
+            plan_purchased: plan,
           }),
         });
         if (!res.ok) {

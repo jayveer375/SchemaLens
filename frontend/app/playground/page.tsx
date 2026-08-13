@@ -194,8 +194,8 @@ function PlaygroundLocked() {
 
   return (
     <div
-      className="flex flex-col items-center justify-center"
-      style={{ height: "calc(100vh - 57px)", background: "var(--surface)" }}
+      className="flex flex-col items-center justify-center h-full w-full overflow-hidden"
+      style={{ background: "var(--surface)" }}
     >
       {/* Glow backdrop */}
       <div className="absolute inset-0 pointer-events-none overflow-hidden" aria-hidden>
@@ -716,13 +716,10 @@ export default function PlaygroundPage() {
 
   return (
     <div
-      className="flex flex-col"
+      className="flex flex-col h-full w-full overflow-hidden relative"
       style={{
-        height: "calc(100vh - 57px)",
         background: "var(--surface)",
-        overflow: "hidden",
-        position: "relative",
-        minWidth: "320px", // Minimum width to prevent extreme compression
+        minWidth: "320px",
       }}
     >
       {/* ── Header ─────────────────────────────────────────────────────────── */}
@@ -731,22 +728,19 @@ export default function PlaygroundPage() {
         initial={{ opacity: 0, y: -8 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.25 }}
-        className="flex items-center gap-2 px-3 sm:px-5 py-3 flex-shrink-0 scroll-x
+        className="flex items-center justify-between gap-2 px-3 sm:px-5 py-2 flex-shrink-0 scroll-x
           border-b border-[var(--border)] bg-[var(--card)]"
         style={{
           overflowX: "auto",
           scrollbarWidth: "thin",
           scrollbarColor: "var(--border) transparent",
-          minHeight: "65px", // Ensure consistent height
-          WebkitOverflowScrolling: "touch", // Better mobile scrolling
-          position: "sticky", // Stick to top during transitions
-          top: 0,
+          minHeight: "56px",
+          WebkitOverflowScrolling: "touch",
           zIndex: 10,
-          willChange: "scroll-position", // Optimize scroll performance
         }}
       >
         {/* Title */}
-        <div className="flex items-center gap-2.5 shrink-0 mr-3">
+        <div className="flex items-center gap-2.5 shrink-0 mr-2">
           <div
             className="w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0"
             style={{ background: "var(--primary-light)", color: "var(--primary)" }}
@@ -754,29 +748,23 @@ export default function PlaygroundPage() {
             <Terminal size={16} />
           </div>
           <div className="flex-shrink-0">
-            <h1 className="text-[15px] font-bold text-[var(--text)] leading-tight whitespace-nowrap">
+            <h1 className="text-[14px] sm:text-[15px] font-bold text-[var(--text)] leading-tight whitespace-nowrap">
               SQL Playground
             </h1>
-            <p className="text-[11px] text-[var(--text-subtle)] leading-tight whitespace-nowrap hidden lg:block">
+            <p className="text-[11px] text-[var(--text-subtle)] leading-tight whitespace-nowrap hidden 2xl:block">
               Write and test SQL · <kbd className="font-mono">Ctrl+Enter</kbd> run ·{" "}
               <kbd className="font-mono">Ctrl+S</kbd> download
             </p>
           </div>
         </div>
 
-        {/* Action buttons — all inline, scroll if needed */}
-        <div 
-          className="flex items-center gap-2"
-          style={{
-            minWidth: "fit-content", // Ensures buttons don't shrink below their natural width
-            flexShrink: 0, // Prevents shrinking when container is small
-          }}
-        >
+        {/* Action buttons — dynamic & responsive layout */}
+        <div className="flex items-center gap-1.5 sm:gap-2 flex-1 justify-end min-w-0 pr-3">
           <motion.button
             whileHover={{ scale: 1.02 }}
             whileTap={{ scale: 0.96 }}
             onClick={runSQL}
-            className="btn-primary btn-sm gap-1.5 whitespace-nowrap flex-shrink-0"
+            className="btn-primary btn-sm gap-1.5 whitespace-nowrap flex-shrink-0 px-2.5 sm:px-3"
             title="Run SQL (Ctrl+Enter)"
           >
             <Play size={13} />
@@ -787,22 +775,24 @@ export default function PlaygroundPage() {
             whileHover={{ scale: 1.02 }}
             whileTap={{ scale: 0.96 }}
             onClick={formatSQL}
-            className="btn-ghost btn-sm gap-1.5 whitespace-nowrap flex-shrink-0"
+            className="btn-ghost btn-sm gap-1.5 whitespace-nowrap flex-shrink-0 px-2 sm:px-3"
             title="Format SQL"
           >
             <Wand2 size={13} />
-            <span>Format SQL</span>
+            <span className="hidden xl:inline">Format SQL</span>
+            <span className="xl:hidden hidden sm:inline">Format</span>
           </motion.button>
 
           <motion.button
             whileHover={{ scale: 1.02 }}
             whileTap={{ scale: 0.96 }}
             onClick={() => setAiPanelOpen(!aiPanelOpen)}
-            className={cn("btn-ghost btn-sm gap-1.5 whitespace-nowrap flex-shrink-0", aiPanelOpen && "bg-[var(--surface)]")}
+            className={cn("btn-ghost btn-sm gap-1.5 whitespace-nowrap flex-shrink-0 px-2 sm:px-3", aiPanelOpen && "bg-[var(--surface)]")}
             title="AI SQL Generator"
           >
             <Sparkles size={13} />
-            <span>AI Generate</span>
+            <span className="hidden xl:inline">AI Generate</span>
+            <span className="xl:hidden hidden sm:inline">AI</span>
           </motion.button>
 
           {/* Diagram Dropdown Button */}
@@ -821,11 +811,11 @@ export default function PlaygroundPage() {
                 }
                 setDiagramDropdownOpen((v) => !v);
               }}
-              className={cn("btn-ghost btn-sm gap-1.5 whitespace-nowrap", diagramDropdownOpen && "bg-[var(--surface)]")}
+              className={cn("btn-ghost btn-sm gap-1.5 whitespace-nowrap px-2 sm:px-3", diagramDropdownOpen && "bg-[var(--surface)]")}
               title="Generate Diagram"
             >
               <GitFork size={13} />
-              <span>Diagram</span>
+              <span className="hidden sm:inline">Diagram</span>
               <ChevronDown
                 size={11}
                 className={cn("transition-transform duration-200", diagramDropdownOpen && "rotate-180")}
@@ -890,7 +880,7 @@ export default function PlaygroundPage() {
             whileHover={{ scale: 1.02 }}
             whileTap={{ scale: 0.96 }}
             onClick={copySQL}
-            className="btn-ghost btn-sm gap-1.5 whitespace-nowrap flex-shrink-0"
+            className="btn-ghost btn-sm gap-1.5 whitespace-nowrap flex-shrink-0 px-2 sm:px-3"
             title="Copy SQL"
           >
             <AnimatePresence mode="wait" initial={false}>
@@ -904,7 +894,7 @@ export default function PlaygroundPage() {
                   className="flex items-center gap-1.5 text-[var(--success)]"
                 >
                   <CheckCircle2 size={13} />
-                  <span>Copied!</span>
+                  <span className="hidden lg:inline">Copied!</span>
                 </motion.span>
               ) : (
                 <motion.span
@@ -916,7 +906,7 @@ export default function PlaygroundPage() {
                   className="flex items-center gap-1.5"
                 >
                   <Copy size={13} />
-                  <span>Copy</span>
+                  <span className="hidden lg:inline">Copy</span>
                 </motion.span>
               )}
             </AnimatePresence>
@@ -926,24 +916,24 @@ export default function PlaygroundPage() {
             whileHover={{ scale: 1.02 }}
             whileTap={{ scale: 0.96 }}
             onClick={downloadSQL}
-            className="btn-ghost btn-sm gap-1.5 whitespace-nowrap flex-shrink-0"
+            className="btn-ghost btn-sm gap-1.5 whitespace-nowrap flex-shrink-0 px-2 sm:px-3"
             title="Download schema.sql (Ctrl+S)"
           >
             <Download size={13} />
-            <span>Download</span>
+            <span className="hidden xl:inline">Download</span>
           </motion.button>
 
-          <div className="w-px h-6 bg-[var(--border)] mx-1 flex-shrink-0" />
+          <div className="w-px h-5 bg-[var(--border)] mx-0.5 flex-shrink-0" />
 
           <motion.button
             whileHover={{ scale: 1.02 }}
             whileTap={{ scale: 0.96 }}
             onClick={() => { setHistoryOpen(!historyOpen); setTablesOpen(false); }}
-            className={cn("btn-ghost btn-sm gap-1.5 whitespace-nowrap flex-shrink-0", historyOpen && "bg-[var(--surface)]")}
+            className={cn("btn-ghost btn-sm gap-1.5 whitespace-nowrap flex-shrink-0 px-2 sm:px-3", historyOpen && "bg-[var(--surface)]")}
             title="Toggle history panel"
           >
             <History size={13} />
-            <span>History</span>
+            <span className="hidden lg:inline">History</span>
             {history.length > 0 && (
               <span className="ml-1 px-1.5 py-0.5 rounded-full text-[10px] font-bold bg-[var(--primary)] text-white">
                 {history.length}
@@ -955,11 +945,11 @@ export default function PlaygroundPage() {
             whileHover={{ scale: 1.02 }}
             whileTap={{ scale: 0.96 }}
             onClick={() => { setTablesOpen(!tablesOpen); setHistoryOpen(false); }}
-            className={cn("btn-ghost btn-sm gap-1.5 whitespace-nowrap flex-shrink-0", tablesOpen && "bg-[var(--surface)]")}
+            className={cn("btn-ghost btn-sm gap-1.5 whitespace-nowrap flex-shrink-0 px-2 sm:px-3", tablesOpen && "bg-[var(--surface)]")}
             title="Toggle table explorer"
           >
             <Table size={13} />
-            <span>Tables</span>
+            <span className="hidden lg:inline">Tables</span>
             {currentTables.length > 0 && (
               <span className="ml-1 px-1.5 py-0.5 rounded-full text-[10px] font-bold bg-[var(--primary)] text-white">
                 {currentTables.length}
@@ -1163,7 +1153,7 @@ export default function PlaygroundPage() {
           </div>
 
           {/* Monaco */}
-          <div className="flex-1" style={{ minHeight: 0 }}>
+          <div className="flex-1 min-h-0 relative overflow-hidden h-full">
             <MonacoEditor
               height="100%"
               language="sql"
@@ -1412,8 +1402,8 @@ interface OutputPanelProps {
 }
 
 function OutputPanel({ result, outputOpen, onToggle }: OutputPanelProps) {
-  const collapsedH = "42px";
-  const expandedH  = "180px";
+  const collapsedH = "38px";
+  const expandedH  = "150px";
 
   return (
     <motion.div
@@ -1424,6 +1414,7 @@ function OutputPanel({ result, outputOpen, onToggle }: OutputPanelProps) {
       style={{
         background: "var(--card)",
         height: outputOpen ? expandedH : collapsedH,
+        maxHeight: "35vh",
         transition: "height 0.25s cubic-bezier(0.16,1,0.3,1)",
       }}
     >

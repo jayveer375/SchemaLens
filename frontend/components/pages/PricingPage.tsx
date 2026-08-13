@@ -249,7 +249,7 @@ export default function PricingPage() {
           </ul>
 
           <button disabled className="btn-ghost w-full justify-center py-3 text-sm opacity-50 cursor-default">
-            {currentPlan === "free" ? "Current Plan" : "Basic Access"}
+            {currentPlan === "free" ? "Current Plan" : currentPlan === "ultimate" ? "Included in Ultimate" : "Basic Access"}
           </button>
         </motion.div>
 
@@ -316,6 +316,10 @@ export default function PricingPage() {
                 Manage Subscription
               </button>
             </div>
+          ) : currentPlan === "ultimate" ? (
+            <div className="text-center text-sm text-[var(--text-muted)] font-medium py-3 rounded-xl bg-[var(--surface)] border border-[var(--border)] opacity-75">
+              Included in Ultimate
+            </div>
           ) : (
             <motion.button
               whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.97 }}
@@ -377,19 +381,19 @@ export default function PricingPage() {
 
           <ul className="space-y-2.5 mb-6 flex-1">
             {[
-              "UNLIMITED Conversions",
-              "UNLIMITED Projects",
-              "UNLIMITED Images per project",
-              "UNLIMITED AI Assistant Credits",
-              "No Question Credit Deductions",
-              "Full SQL Playground Access",
-              "History & Audit Logs",
-              "ZIP & Advanced Exports",
-              "Highest Priority Queue",
-              "VIP 24/7 Priority Support",
+              "Unlimited conversions / month",
+              "Unlimited projects",
+              "Unlimited images per project",
+              "Unlimited AI assistant credits",
+              "No question credit deductions",
+              "Full SQL Playground access",
+              "History & audit logs",
+              "ZIP & advanced exports",
+              "Highest priority queue",
+              "VIP 24/7 priority support",
             ].map((f) => (
-              <li key={f} className="flex items-center gap-2.5 text-sm font-medium text-[var(--text)]">
-                <Sparkles size={14} className="text-purple-500 flex-shrink-0" />
+              <li key={f} className="flex items-center gap-2.5 text-sm text-[var(--text-muted)]">
+                <Check size={13} className="text-emerald-500 flex-shrink-0" />
                 {f}
               </li>
             ))}
@@ -397,7 +401,7 @@ export default function PricingPage() {
 
           {currentPlan === "ultimate" ? (
             <div className="space-y-2">
-              <div className="text-center text-sm text-purple-600 dark:text-purple-400 font-bold py-3 rounded-xl bg-purple-50 dark:bg-purple-500/10">
+              <div className="text-center text-sm text-purple-600 dark:text-purple-400 font-bold py-3 rounded-xl bg-purple-50 dark:bg-purple-500/10 border border-purple-200 dark:border-purple-500/20">
                 ✓ Ultimate Plan Active
               </div>
             </div>

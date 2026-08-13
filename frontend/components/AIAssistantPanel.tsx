@@ -432,7 +432,7 @@ export default function AIAssistantPanel() {
             exit={{ x: "100%" }}
             transition={{ type: "spring", damping: 28, stiffness: 300 }}
             className={cn(
-              "fixed right-0 top-0 bottom-0 z-50 w-full sm:w-[500px] md:w-[560px]",
+              "fixed right-0 top-0 bottom-0 z-50 w-full sm:w-[600px] md:w-[720px] lg:w-[840px]",
               "flex flex-col bg-[var(--card)] border-l border-[var(--border)] shadow-2xl overflow-hidden"
             )}
           >

@@ -94,7 +94,8 @@ User question: ${question}`;
 // ─────────────────────────────────────────────────────────────────────────────
 export async function POST(req: NextRequest) {
   try {
-    if (!MISTRAL_API_KEY) {
+    const apiKey = process.env.MISTRAL_API_KEY || MISTRAL_API_KEY;
+    if (!apiKey) {
       return NextResponse.json({ error: "AI service is not configured (missing MISTRAL_API_KEY)" }, { status: 503 });
     }
 
@@ -133,7 +134,7 @@ export async function POST(req: NextRequest) {
     const res = await fetch(MISTRAL_API_URL, {
       method: "POST",
       headers: {
-        Authorization: `Bearer ${MISTRAL_API_KEY}`,
+        Authorization: `Bearer ${apiKey}`,
         "Content-Type": "application/json",
       },
       body: JSON.stringify({

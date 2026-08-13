@@ -591,7 +591,7 @@ export default function AssistantPage({ onNavigate }: { onNavigate: (p: string) 
   ];
 
   return (
-    <div className="w-full max-w-6xl mx-auto space-y-6 pb-10 px-2 sm:px-4">
+    <div className="flex-1 flex flex-col h-full w-full overflow-y-auto px-4 sm:px-8 py-6 space-y-6 pb-12">
 
       {/* ── Header ─────────────────────────────────────────────────────────── */}
       <div className="flex items-start justify-between gap-4">

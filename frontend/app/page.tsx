@@ -133,20 +133,20 @@ export default function RootPage() {
     <div className="flex min-h-screen bg-[var(--surface)]">
       <Sidebar page={appPage} onNavigate={navigate} />
 
-      <div className="app-main flex-1 flex flex-col min-h-screen" style={{ marginLeft: ml, transition: "margin-left 0.25s cubic-bezier(0.16,1,0.3,1)" }}>
+      <div className="app-main flex-1 flex flex-col min-h-screen min-w-0 max-w-full overflow-x-hidden" style={{ marginLeft: ml, transition: "margin-left 0.25s cubic-bezier(0.16,1,0.3,1)" }}>
         <Navbar onNavigate={navigate} page={appPage} />
 
-        <main className="flex-1 pt-[57px] relative overflow-hidden">
+        <main className="flex-1 pt-[57px] relative overflow-hidden flex flex-col min-w-0 w-full">
           {appPage === "dashboard" && <DatabaseScene />}
-          {appPage === "playground" ? (
+          {appPage === "playground" || appPage === "assistant" ? (
             <AnimatePresence mode="wait">
               <motion.div
-                key="playground"
+                key={appPage}
                 initial={{ opacity: 0 }}
                 animate={{ opacity: 1 }}
                 exit={{ opacity: 0 }}
                 transition={{ duration: 0.15 }}
-                className="h-[calc(100vh-57px)]"
+                className="h-full w-full overflow-hidden flex flex-col"
               >
                 {renderPage()}
               </motion.div>

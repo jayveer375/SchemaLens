@@ -51,9 +51,11 @@ export default function QuickConvertPage({ onNavigate }: { onNavigate: (p: strin
     getSubscription, incrementConversions,
     quickHistory, addQuickResult, clearQuickHistory,
     theme, user, setPlaygroundInitialSQL,
+    customColumns, globalPromptRules, autoApplyToAllTools,
   } = useStore();
 
   const sub = getSubscription();
+  const activeCustomCols = (customColumns || []).filter((c) => c.enabled);
 
   const [qcFile, setQcFile]       = useState<File | null>(null);
   const [qcPreview, setQcPreview] = useState<string | null>(null);
@@ -89,6 +91,12 @@ export default function QuickConvertPage({ onNavigate }: { onNavigate: (p: strin
         const form = new FormData();
         form.append("image", file);
         form.append("dialect", selectedDb);
+        if (autoApplyToAllTools && activeCustomCols.length > 0) {
+          form.append("customColumns", JSON.stringify(activeCustomCols));
+        }
+        if (autoApplyToAllTools && globalPromptRules) {
+          form.append("customRules", globalPromptRules);
+        }
         const t0  = Date.now();
         const res = await fetch("/api/analyze", { method: "POST", body: form });
         const data = await res.json();
@@ -177,6 +185,24 @@ export default function QuickConvertPage({ onNavigate }: { onNavigate: (p: strin
           </button>
         )}
       </div>
+
+      {/* Active Customization Indicator */}
+      {autoApplyToAllTools && activeCustomCols.length > 0 && (
+        <div className="mb-6 p-3 rounded-xl bg-primary-500/10 border border-primary-500/20 flex items-center justify-between gap-2">
+          <div className="flex items-center gap-2 text-xs text-primary-600 dark:text-primary-400 font-medium">
+            <Sparkles size={14} className="shrink-0" />
+            <span>
+              Customization Active: Applying <strong>{activeCustomCols.length} custom column{activeCustomCols.length !== 1 ? "s" : ""}</strong> ({activeCustomCols.map((c) => c.name).join(", ")})
+            </span>
+          </div>
+          <button
+            onClick={() => onNavigate("settings")}
+            className="text-xs text-primary-600 dark:text-primary-400 underline hover:opacity-80 shrink-0"
+          >
+            Customize
+          </button>
+        </div>
+      )}
 
       {/* ── Database Selector ── */}
       <div className="mb-7">

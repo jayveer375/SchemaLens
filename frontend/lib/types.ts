@@ -107,3 +107,23 @@ export interface ActivityLog {
   timestamp: number;
   status: "success" | "failed";
 }
+
+// ── Customization & Schema Rules ─────────────────────────────────────────────
+export interface CustomColumnConstraints {
+  notNull: boolean;
+  primaryKey: boolean;
+  unique: boolean;
+  indexed: boolean;
+}
+
+export interface CustomColumn {
+  id: string;
+  name: string;
+  dataType: string;
+  defaultValue?: string;
+  description?: string;
+  constraints: CustomColumnConstraints;
+  enabled: boolean;
+  createdAt: number;
+}
+

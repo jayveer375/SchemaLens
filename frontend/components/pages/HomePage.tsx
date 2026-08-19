@@ -19,7 +19,9 @@ export default function HomePage() {
     appState, setAppState,
     currentResult, setCurrentResult,
     setError, addToHistory, reset,
+    customColumns, globalPromptRules, autoApplyToAllTools,
   } = useStore();
+  const activeCustomCols = (customColumns || []).filter((c) => c.enabled);
 
   const [imageUrl, setImageUrl] = useState<string | null>(null);
   const [file, setFile] = useState<File | null>(null);
@@ -37,6 +39,12 @@ export default function HomePage() {
     try {
       const form = new FormData();
       form.append("image", f);
+      if (autoApplyToAllTools && activeCustomCols.length > 0) {
+        form.append("customColumns", JSON.stringify(activeCustomCols));
+      }
+      if (autoApplyToAllTools && globalPromptRules) {
+        form.append("customRules", globalPromptRules);
+      }
 
       const t0 = Date.now();
       const res = await fetch("/api/analyze", { method: "POST", body: form });

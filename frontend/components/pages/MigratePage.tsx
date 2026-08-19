@@ -160,10 +160,13 @@ function DialectPicker({
   );
 }
 
-// ── Main page ────────────────────────────────────────────────────────────────
 export default function MigratePage({ onNavigate }: { onNavigate: (p: string) => void }) {
-  const { getSubscription, incrementConversions, theme, setPlaygroundInitialSQL } = useStore();
+  const {
+    getSubscription, incrementConversions, theme, setPlaygroundInitialSQL,
+    customColumns, globalPromptRules, autoApplyToAllTools,
+  } = useStore();
   const sub = getSubscription();
+  const activeCustomCols = (customColumns || []).filter((c) => c.enabled);
 
   const [sourceDialect, setSourceDialect] = useState("mysql");
   const [targetDialect, setTargetDialect] = useState("postgresql");
@@ -226,7 +229,13 @@ export default function MigratePage({ onNavigate }: { onNavigate: (p: string) =>
       const res = await fetch("/api/migrate", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ sql: inputSql.trim(), source: sourceDialect, target: targetDialect }),
+        body: JSON.stringify({
+          sql: inputSql.trim(),
+          source: sourceDialect,
+          target: targetDialect,
+          customColumns: autoApplyToAllTools ? activeCustomCols : [],
+          customRules: autoApplyToAllTools ? globalPromptRules : "",
+        }),
       });
       const data = await res.json();
       stopSteps();
@@ -316,6 +325,24 @@ export default function MigratePage({ onNavigate }: { onNavigate: (p: string) =>
           </button>
         )}
       </div>
+
+      {/* Active Customization Indicator */}
+      {autoApplyToAllTools && activeCustomCols.length > 0 && (
+        <div className="mb-6 p-3 rounded-xl bg-primary-500/10 border border-primary-500/20 flex items-center justify-between gap-2">
+          <div className="flex items-center gap-2 text-xs text-primary-600 dark:text-primary-400 font-medium">
+            <Sparkles size={14} className="shrink-0" />
+            <span>
+              Customization Active: Preserving &amp; mapping <strong>{activeCustomCols.length} custom column{activeCustomCols.length !== 1 ? "s" : ""}</strong> ({activeCustomCols.map((c) => c.name).join(", ")}) during dialect conversion.
+            </span>
+          </div>
+          <button
+            onClick={() => onNavigate("settings")}
+            className="text-xs text-primary-600 dark:text-primary-400 underline hover:opacity-80 shrink-0"
+          >
+            Customize
+          </button>
+        </div>
+      )}
 
       {/* ── Dialect selectors ── */}
       <div className="card p-5 mb-6">

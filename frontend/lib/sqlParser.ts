@@ -241,3 +241,70 @@ export function validateSQL(sql: string): { valid: boolean; error?: string } {
   }
   return { valid: true };
 }
+
+export function generateMermaidFromSchema(
+  schema: Schema,
+  diagramType: "er" | "flowchart" | "dfd0" | "dfd1" | "class" = "er"
+): string {
+  if (diagramType === "er") {
+    const lines: string[] = ["erDiagram"];
+    for (const rel of schema.relationships) {
+      const fromT = rel.fromTable.replace(/[^a-zA-Z0-9_]/g, "_");
+      const toT = rel.toTable.replace(/[^a-zA-Z0-9_]/g, "_");
+      lines.push(`    ${toT} ||--o{ ${fromT} : "has"`);
+    }
+    for (const table of schema.tables) {
+      const tName = table.name.replace(/[^a-zA-Z0-9_]/g, "_");
+      lines.push(`    ${tName} {`);
+      for (const col of table.columns) {
+        let type = "string";
+        const t = (col.type || "").toLowerCase();
+        if (t.includes("int") || t.includes("serial")) type = "int";
+        else if (t.includes("float") || t.includes("double") || t.includes("decimal") || t.includes("numeric")) type = "float";
+        else if (t.includes("bool")) type = "boolean";
+        else if (t.includes("date") || t.includes("time")) type = "datetime";
+
+        let pkfk = "";
+        if (col.isPrimaryKey) pkfk = " PK";
+        else if (col.isForeignKey) pkfk = " FK";
+        const cName = col.name.replace(/[^a-zA-Z0-9_]/g, "_");
+        lines.push(`        ${type} ${cName}${pkfk}`);
+      }
+      lines.push(`    }`);
+    }
+    return lines.join("\n");
+  } else if (diagramType === "class") {
+    const lines: string[] = ["classDiagram"];
+    for (const table of schema.tables) {
+      const tName = table.name.replace(/[^a-zA-Z0-9_]/g, "_");
+      lines.push(`    class ${tName} {`);
+      for (const col of table.columns) {
+        const cName = col.name.replace(/[^a-zA-Z0-9_]/g, "_");
+        lines.push(`        +string ${cName}`);
+      }
+      lines.push(`    }`);
+    }
+    for (const rel of schema.relationships) {
+      const fromT = rel.fromTable.replace(/[^a-zA-Z0-9_]/g, "_");
+      const toT = rel.toTable.replace(/[^a-zA-Z0-9_]/g, "_");
+      lines.push(`    ${toT} <|-- ${fromT}`);
+    }
+    return lines.join("\n");
+  } else {
+    // flowchart / dfd
+    const lines: string[] = ["flowchart TD"];
+    for (const table of schema.tables) {
+      const tName = table.name.replace(/[^a-zA-Z0-9_]/g, "_");
+      const colSummary = table.columns.slice(0, 4).map((c) => c.name).join(", ");
+      lines.push(`    ${tName}["${table.name}${colSummary ? ` (${colSummary})` : ""}"]`);
+    }
+    for (const rel of schema.relationships) {
+      const fromT = rel.fromTable.replace(/[^a-zA-Z0-9_]/g, "_");
+      const toT = rel.toTable.replace(/[^a-zA-Z0-9_]/g, "_");
+      const safeLabel = (rel.fromColumn || "rel").replace(/[^a-zA-Z0-9_]/g, "_");
+      lines.push(`    ${toT} -->|${safeLabel}| ${fromT}`);
+    }
+    return lines.join("\n");
+  }
+}
+

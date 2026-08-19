@@ -466,3 +466,22 @@ body {
   .assistant-popover { width: 165px; }
 }
 
+/* ─────────────────────────────────────────────────────────────────────────────
+   Suppress stray Mermaid error elements inserted on document body
+───────────────────────────────────────────────────────────────────────────── */
+#dmermaid,
+[id^="dmermaid"],
+svg[id^="dmermaid"],
+div[id^="dmermaid"] {
+  display: none !important;
+  visibility: hidden !important;
+  opacity: 0 !important;
+  pointer-events: none !important;
+  position: absolute !important;
+  left: -9999px !important;
+  top: -9999px !important;
+  width: 0 !important;
+  height: 0 !important;
+}
+
+

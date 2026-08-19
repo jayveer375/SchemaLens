@@ -1,7 +1,8 @@
 import { create } from "zustand";
 import { persist } from "zustand/middleware";
-import type { User, Project, ProjectFile, ActivityLog, AdminUser, QuickConvertResult, Subscription, PlanId } from "./types";
+import type { User, Project, ProjectFile, ActivityLog, AdminUser, QuickConvertResult, Subscription, PlanId, CustomColumn } from "./types";
 import { defaultSubscription, maybeResetMonthly, incrementAIGenerations as incrementAIGenerationsSub } from "./subscription";
+import { PRESET_CUSTOM_COLUMNS } from "./customization";
 
 export interface AnalysisResult {
   id: string;
@@ -114,7 +115,20 @@ interface PlaygroundSlice {
   setPlaygroundInitialSQL: (sql: string | null) => void;
 }
 
-type Store = AuthSlice & UISlice & SubscriptionSlice & QuickConvertSlice & LegacyAnalysisSlice & ProjectsSlice & AdminSlice & PlaygroundSlice & CopilotSlice;
+interface CustomizationSlice {
+  customColumns: CustomColumn[];
+  globalPromptRules: string;
+  autoApplyToAllTools: boolean;
+  addCustomColumn: (col: Omit<CustomColumn, "id" | "createdAt">) => void;
+  updateCustomColumn: (id: string, updates: Partial<CustomColumn>) => void;
+  deleteCustomColumn: (id: string) => void;
+  toggleCustomColumn: (id: string) => void;
+  setGlobalPromptRules: (rules: string) => void;
+  setAutoApplyToAllTools: (val: boolean) => void;
+  resetCustomColumnsToPresets: () => void;
+}
+
+type Store = AuthSlice & UISlice & SubscriptionSlice & QuickConvertSlice & LegacyAnalysisSlice & ProjectsSlice & AdminSlice & PlaygroundSlice & CopilotSlice & CustomizationSlice;
 
 export const useStore = create<Store>()(
   persist(
@@ -316,19 +330,93 @@ export const useStore = create<Store>()(
         set((state) => ({
           copilotContext: { ...state.copilotContext, ...ctx },
         })),
+
+      // ── Customization & Schema Rules ────────────────────────────────────────
+      customColumns: [
+        {
+          id: "col-roll-number",
+          name: "roll_number",
+          dataType: "VARCHAR(50)",
+          defaultValue: "",
+          description: "Unique student or candidate identification number used by educational institutions",
+          constraints: { notNull: true, primaryKey: false, unique: true, indexed: true },
+          enabled: true,
+          createdAt: Date.now() - 3600000,
+        },
+        {
+          id: "col-created-at",
+          name: "created_at",
+          dataType: "TIMESTAMP",
+          defaultValue: "CURRENT_TIMESTAMP",
+          description: "Timestamp when record was initially created for audit trail",
+          constraints: { notNull: true, primaryKey: false, unique: false, indexed: false },
+          enabled: true,
+          createdAt: Date.now() - 7200000,
+        },
+        {
+          id: "col-updated-at",
+          name: "updated_at",
+          dataType: "TIMESTAMP",
+          defaultValue: "CURRENT_TIMESTAMP",
+          description: "Timestamp when record was last modified",
+          constraints: { notNull: true, primaryKey: false, unique: false, indexed: false },
+          enabled: true,
+          createdAt: Date.now() - 7200000,
+        },
+      ],
+      globalPromptRules: "",
+      autoApplyToAllTools: true,
+      addCustomColumn: (col) =>
+        set((state) => ({
+          customColumns: [
+            ...state.customColumns,
+            {
+              ...col,
+              id: "col-" + Math.random().toString(36).substring(2, 9) + Date.now().toString(36),
+              createdAt: Date.now(),
+            },
+          ],
+        })),
+      updateCustomColumn: (id, updates) =>
+        set((state) => ({
+          customColumns: state.customColumns.map((c) => (c.id === id ? { ...c, ...updates } : c)),
+        })),
+      deleteCustomColumn: (id) =>
+        set((state) => ({
+          customColumns: state.customColumns.filter((c) => c.id !== id),
+        })),
+      toggleCustomColumn: (id) =>
+        set((state) => ({
+          customColumns: state.customColumns.map((c) =>
+            c.id === id ? { ...c, enabled: !c.enabled } : c
+          ),
+        })),
+      setGlobalPromptRules: (rules) => set({ globalPromptRules: rules }),
+      setAutoApplyToAllTools: (val) => set({ autoApplyToAllTools: val }),
+      resetCustomColumnsToPresets: () =>
+        set({
+          customColumns: PRESET_CUSTOM_COLUMNS.map((p, idx) => ({
+            ...p,
+            id: `preset-${idx}-${Date.now()}`,
+            createdAt: Date.now(),
+          })),
+        }),
     }),
     {
       name: "er-ai-studio-v4",
       partialize: (state) => ({
-        user:             state.user,
-        token:            state.token,
-        isAuthenticated:  state.isAuthenticated,
-        theme:            state.theme,
-        selectedLanguage: state.selectedLanguage,
-        projects:         state.projects,
-        activeProjectId:  state.activeProjectId,
-        subscription:     state.subscription,
-        quickHistory:     state.quickHistory,
+        user:                state.user,
+        token:               state.token,
+        isAuthenticated:     state.isAuthenticated,
+        theme:               state.theme,
+        selectedLanguage:    state.selectedLanguage,
+        projects:            state.projects,
+        activeProjectId:     state.activeProjectId,
+        subscription:        state.subscription,
+        quickHistory:        state.quickHistory,
+        customColumns:       state.customColumns,
+        globalPromptRules:   state.globalPromptRules,
+        autoApplyToAllTools: state.autoApplyToAllTools,
       }),
     }
   )

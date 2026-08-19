@@ -30,7 +30,12 @@ const STATUS_CONFIG = {
 };
 
 export default function ProjectDetailPage({ onNavigate }: { onNavigate: (p: string) => void }) {
-  const { projects, activeProjectId, upsertFile, updateFileStatus, deleteFile, setActiveProject, theme, selectedLanguage, user, getSubscription, incrementConversions } = useStore();
+  const {
+    projects, activeProjectId, upsertFile, updateFileStatus, deleteFile, setActiveProject,
+    theme, selectedLanguage, user, getSubscription, incrementConversions,
+    customColumns, globalPromptRules, autoApplyToAllTools,
+  } = useStore();
+  const activeCustomCols = (customColumns || []).filter((c) => c.enabled);
   const ownerId = user?.id ?? "";
   const project = projects.find(p => p.id === activeProjectId && p.ownerId === ownerId);
   const [activeFolder, setActiveFolder] = useState<"images" | "sql" | "txt" | "json">("images");
@@ -87,6 +92,12 @@ export default function ProjectDetailPage({ onNavigate }: { onNavigate: (p: stri
         const form = new FormData();
         form.append("image", blob, file.name);
         form.append("dialect", project.dbType);
+        if (autoApplyToAllTools && activeCustomCols.length > 0) {
+          form.append("customColumns", JSON.stringify(activeCustomCols));
+        }
+        if (autoApplyToAllTools && globalPromptRules) {
+          form.append("customRules", globalPromptRules);
+        }
         const t0 = Date.now();
         const res = await fetch("/api/analyze", { method: "POST", body: form });
         const data = await res.json();
@@ -211,6 +222,12 @@ export default function ProjectDetailPage({ onNavigate }: { onNavigate: (p: stri
       const form = new FormData();
       form.append("image", blob, file.name);
       form.append("dialect", project.dbType);
+      if (autoApplyToAllTools && activeCustomCols.length > 0) {
+        form.append("customColumns", JSON.stringify(activeCustomCols));
+      }
+      if (autoApplyToAllTools && globalPromptRules) {
+        form.append("customRules", globalPromptRules);
+      }
       const t0 = Date.now();
       const res = await fetch("/api/analyze", { method: "POST", body: form });
       const data = await res.json();
@@ -245,7 +262,12 @@ export default function ProjectDetailPage({ onNavigate }: { onNavigate: (p: stri
       const res = await fetch("/api/generate", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ description: genDesc.trim(), dialect: project.dbType }),
+        body: JSON.stringify({
+          description: genDesc.trim(),
+          dialect: project.dbType,
+          customColumns: autoApplyToAllTools ? activeCustomCols : [],
+          customRules: autoApplyToAllTools ? globalPromptRules : "",
+        }),
       });
       const data = await res.json();
       clearInterval(stepId);

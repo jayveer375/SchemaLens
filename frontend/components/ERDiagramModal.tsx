@@ -450,6 +450,38 @@ function ModalShell({ sql, theme, onClose, initialTab = "er" }: { sql: string; t
   );
 }
 
+export function InlineDiagramViewer({
+  sql,
+  diagramType = "er",
+  theme = "light",
+  minHeight = 440,
+}: {
+  sql: string;
+  diagramType?: DiagramType;
+  theme?: "light" | "dark";
+  minHeight?: number;
+}) {
+  const isDark = theme === "dark";
+  return (
+    <div
+      className={cn(
+        "w-full rounded-xl border overflow-hidden relative flex flex-col",
+        isDark ? "border-[rgba(255,255,255,0.08)] bg-[#1C1718]" : "border-gray-200 bg-white"
+      )}
+      style={{ height: minHeight }}
+    >
+      <ReactFlowProvider key={`${diagramType}-${theme}-${sql.length}`}>
+        <DiagramCanvas
+          sql={sql}
+          diagramType={diagramType}
+          isDark={isDark}
+          onClose={() => {}}
+        />
+      </ReactFlowProvider>
+    </div>
+  );
+}
+
 // ── Public export ─────────────────────────────────────────────────────────────
 export default function ERDiagramModal({ sql, isOpen, onClose, theme, initialTab = "er" }: {
   sql: string; isOpen: boolean; onClose: () => void; theme: "light" | "dark"; initialTab?: DiagramType;

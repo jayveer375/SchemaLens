@@ -282,7 +282,11 @@ function sanitizeSQLContext(text: string): string {
 
 // ── Main Component ─────────────────────────────────────────────────────────────
 export default function PlaygroundPage() {
-  const { theme, playgroundInitialSQL, setPlaygroundInitialSQL, setCopilotContext, getSubscription, incrementAIGenerations } = useStore();
+  const {
+    theme, playgroundInitialSQL, setPlaygroundInitialSQL, setCopilotContext, getSubscription, incrementAIGenerations,
+    customColumns, globalPromptRules, autoApplyToAllTools,
+  } = useStore();
+  const activeCustomCols = (customColumns || []).filter((c) => c.enabled);
   const subscription = getSubscription();
   const isPro = canUsePlayground(subscription);
   const canUseAI = canGenerateAI(subscription);
@@ -659,6 +663,8 @@ export default function PlaygroundPage() {
           mode: "generate",
           input: aiPrompt,
           schema: currentSQL,
+          customColumns: autoApplyToAllTools ? activeCustomCols : [],
+          customRules: autoApplyToAllTools ? globalPromptRules : "",
         }),
       });
 

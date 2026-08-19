@@ -83,10 +83,13 @@ TARGET: Oracle Database (SQL*Plus compatible)
 - No LIMIT keyword`,
 };
 
+import { buildCustomColumnsPrompt } from "@/lib/customization";
+import { CustomColumn } from "@/lib/types";
+
 // ─────────────────────────────────────────────────────────────────────────────
 // Prompt builder
 // ─────────────────────────────────────────────────────────────────────────────
-function buildMigratePrompt(source: string, target: string): string {
+function buildMigratePrompt(source: string, target: string, customPrompt: string = ""): string {
   const targetRules = DIALECT_SYNTAX[target] ?? DIALECT_SYNTAX.postgresql;
 
   return `You are an expert SQL migration specialist. Your job is to convert SQL scripts from one database dialect to another with 100% accuracy.
@@ -95,6 +98,8 @@ SOURCE DIALECT: ${source.toUpperCase()}
 ${DIALECT_SYNTAX[source] ?? ""}
 
 ${targetRules}
+
+${customPrompt}
 
 ════════════════════════════════════════════════════════════════
 MIGRATION RULES — follow every rule without exception
@@ -166,6 +171,8 @@ export async function POST(req: NextRequest) {
     const sql: string    = (body.sql ?? "").trim();
     const source: string = (body.source ?? "").toLowerCase();
     const target: string = (body.target ?? "").toLowerCase();
+    const customColumns: CustomColumn[] = body.customColumns ?? [];
+    const customRules: string  = body.customRules ?? "";
 
     if (!sql)    return NextResponse.json({ error: "No SQL script provided" }, { status: 400 });
     if (!source) return NextResponse.json({ error: "Source dialect required" }, { status: 400 });
@@ -173,7 +180,8 @@ export async function POST(req: NextRequest) {
     if (source === target) return NextResponse.json({ error: "Source and target dialects must be different" }, { status: 400 });
     if (sql.length > 50_000) return NextResponse.json({ error: "Script too large (max 50,000 characters)" }, { status: 400 });
 
-    const prompt = buildMigratePrompt(source, target);
+    const customPrompt = buildCustomColumnsPrompt(customColumns, customRules);
+    const prompt = buildMigratePrompt(source, target, customPrompt);
 
     const ctrl  = new AbortController();
     const timer = setTimeout(() => ctrl.abort(), REQUEST_TIMEOUT);

@@ -143,7 +143,7 @@ export default function Sidebar({ page, onNavigate }: SidebarProps) {
       </div>
 
       {/* ── Nav ───────────────────────────────────────────────────────────── */}
-      <nav className="flex-1 px-[10px] py-3 space-y-0.5 overflow-y-auto overflow-x-hidden">
+      <nav className="flex-1 min-h-0 px-[10px] py-3 space-y-0.5 overflow-y-auto overflow-x-hidden scrollbar-thin">
 
         {/* ── ADMIN MODE ────────────────────────────────────────────────── */}
         {page === "admin" ? (
@@ -347,51 +347,7 @@ export default function Sidebar({ page, onNavigate }: SidebarProps) {
       </nav>
 
       {/* ── Bottom: settings + sign out + collapse ────────────────────────── */}
-      <div className="border-t border-[var(--border)] px-[10px] py-3 space-y-0.5 flex-shrink-0">
-
-        {/* AI Credits Display */}
-        {!sidebarCollapsed && (
-          <div className="px-[10px] py-2 mb-2 rounded-lg bg-[var(--card)] border border-[var(--border)]">
-            <div className="flex items-center gap-2 mb-1">
-              <Sparkles size={14} className="text-[var(--primary)]" />
-              <span className="text-[11px] font-semibold text-[var(--text)]">AI Credits</span>
-              {subscription.planId === "ultimate" ? (
-                <span className="ml-auto px-1.5 py-0.2 rounded text-[9px] font-bold bg-gradient-to-r from-purple-500 to-pink-500 text-white">
-                  ULTIMATE
-                </span>
-              ) : isPro ? (
-                <span className="ml-auto px-1.5 py-0.2 rounded text-[9px] font-bold bg-indigo-500/20 text-indigo-400">
-                  PRO
-                </span>
-              ) : null}
-            </div>
-            <div className="flex items-center justify-between">
-              {subscription.planId === "ultimate" ? (
-                <span className="text-[13px] font-bold text-purple-500">Unlimited</span>
-              ) : (
-                <span className="text-[13px] font-bold text-[var(--text)]">
-                  {aiCreditsLeft} <span className="text-[10px] font-normal text-[var(--text-subtle)]">/ {isPro ? 150 : 50}</span>
-                </span>
-              )}
-              {subscription.planId !== "ultimate" && aiCreditsLeft <= 15 && aiCreditsLeft > 0 && (
-                <span className="text-[10px] text-amber-500 font-medium">Low</span>
-              )}
-              {subscription.planId !== "ultimate" && aiCreditsLeft === 0 && (
-                <span className="text-[10px] text-red-500 font-medium">Exhausted</span>
-              )}
-            </div>
-            {subscription.planId === "ultimate" ? (
-              <div className="mt-1.5 h-1.5 bg-gradient-to-r from-purple-500 to-pink-500 rounded-full" />
-            ) : aiCreditsLeft > 0 ? (
-              <div className="mt-1.5 h-1.5 bg-[var(--surface)] rounded-full overflow-hidden">
-                <div 
-                  className="h-full bg-[var(--primary)] transition-all duration-300"
-                  style={{ width: `${Math.min(100, (aiCreditsLeft / (isPro ? 150 : 50)) * 100)}%` }}
-                />
-              </div>
-            ) : null}
-          </div>
-        )}
+      <div className="border-t border-[var(--border)] px-[10px] py-2.5 space-y-0.5 flex-shrink-0 bg-[var(--surface-sidebar)]">
 
         {/* Settings */}
         {page !== "admin" && (
@@ -399,7 +355,7 @@ export default function Sidebar({ page, onNavigate }: SidebarProps) {
             onClick={() => handleNavigate("settings")}
             title="Settings"
             className={cn(
-              "w-full flex items-center gap-3 px-[18px] py-[13px] rounded-[12px] text-[15px] font-medium transition-all duration-200",
+              "w-full flex items-center gap-3 px-[18px] py-[12px] rounded-[12px] text-[15px] font-medium transition-all duration-200",
               page === "settings" ? activeNav : bottomHover,
             )}
             style={page === "settings" ? activeStyle : undefined}

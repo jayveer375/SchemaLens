@@ -13,6 +13,7 @@ import { cn } from "@/lib/utils";
 import { parseSQLSchema } from "@/lib/sqlParser";
 import { analyzeSchema, generateSchemaAwareMockResponse, type AnalysisResult, type AnalysisFinding, type FindingSeverity } from "@/lib/schemaAnalyzer";
 import toast from "react-hot-toast";
+import AICreditsWidget from "@/components/AICreditsWidget";
 import {
   SQLResponseCard,
   SchemaIssueCard,
@@ -344,7 +345,12 @@ function LocalAnalysisCard({ result }: { result: AnalysisResult }) {
 // Main page
 // ─────────────────────────────────────────────────────────────────────────────
 export default function AssistantPage({ onNavigate }: { onNavigate: (p: string) => void }) {
-  const { projects, activeProjectId, setActiveProject, playgroundInitialSQL, setPlaygroundInitialSQL, copilotContext, getSubscription, incrementAIGenerations } = useStore();
+  const {
+    projects, activeProjectId, setActiveProject, playgroundInitialSQL, setPlaygroundInitialSQL,
+    copilotContext, getSubscription, incrementAIGenerations,
+    customColumns, globalPromptRules, autoApplyToAllTools,
+  } = useStore();
+  const activeCustomCols = (customColumns || []).filter((c) => c.enabled);
 
   const [mode, setMode]     = useState<Mode>("chat");
   const [input, setInput]   = useState("");
@@ -481,7 +487,14 @@ export default function AssistantPage({ onNavigate }: { onNavigate: (p: string) 
         const res  = await fetch("/api/assistant", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ mode: "chat", input: question, schema, schemaContext }),
+          body: JSON.stringify({
+            mode: "chat",
+            input: question,
+            schema,
+            schemaContext,
+            customColumns: autoApplyToAllTools ? activeCustomCols : [],
+            customRules: autoApplyToAllTools ? globalPromptRules : "",
+          }),
         });
         const data = await res.json();
         if (!res.ok || data.error) throw new Error(data.error ?? "Request failed");
@@ -523,7 +536,14 @@ export default function AssistantPage({ onNavigate }: { onNavigate: (p: string) 
       const res  = await fetch("/api/assistant", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ mode, input: question, schema, schemaContext }),
+        body: JSON.stringify({
+          mode,
+          input: question,
+          schema,
+          schemaContext,
+          customColumns: autoApplyToAllTools ? activeCustomCols : [],
+          customRules: autoApplyToAllTools ? globalPromptRules : "",
+        }),
       });
       const data = await res.json();
       if (!res.ok || data.error) throw new Error(data.error ?? "Request failed");
@@ -594,16 +614,21 @@ export default function AssistantPage({ onNavigate }: { onNavigate: (p: string) 
     <div className="flex-1 flex flex-col h-full w-full overflow-y-auto px-4 sm:px-8 py-6 space-y-6 pb-12">
 
       {/* ── Header ─────────────────────────────────────────────────────────── */}
-      <div className="flex items-start justify-between gap-4">
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
-          <h1 className="text-3xl font-extrabold text-[var(--text)] tracking-tight">AI Database Assistant</h1>
+          <div className="flex items-center gap-3">
+            <h1 className="text-3xl font-extrabold text-[var(--text)] tracking-tight">AI Database Assistant</h1>
+            <div className="flex items-center gap-1.5 px-3 py-1 rounded-xl border text-xs font-semibold flex-shrink-0"
+              style={{ background: "var(--primary-light)", color: "var(--primary)", borderColor: "var(--primary-border, rgba(37,99,235,0.25))" }}>
+              <Bot size={14} /> Mistral AI
+            </div>
+          </div>
           <p className="text-base text-[var(--text-muted)] mt-1">
             Ask questions, explain queries, generate SQL, or analyze your schema.
           </p>
         </div>
-        <div className="flex items-center gap-2 px-4 py-2 rounded-xl border text-sm font-semibold flex-shrink-0"
-          style={{ background: "var(--primary-light)", color: "var(--primary)", borderColor: "var(--primary-border, rgba(37,99,235,0.25))" }}>
-          <Bot size={15} /> Mistral AI
+        <div className="w-full md:w-64 flex-shrink-0">
+          <AICreditsWidget onNavigate={onNavigate} />
         </div>
       </div>
 

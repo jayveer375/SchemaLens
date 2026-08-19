@@ -34,6 +34,7 @@ import {
   AISuggestionCard,
   ExplanationResponseCard,
 } from "@/components/AIResponseCards";
+import AICreditsWidget from "@/components/AICreditsWidget";
 
 interface ChatMessage {
   id: string;
@@ -222,7 +223,12 @@ function CodeSnippet({ sql, onApplyToPlayground }: { sql: string; onApplyToPlayg
 }
 
 export default function AIAssistantPanel() {
-  const { aiAssistantOpen, setAiAssistantOpen, projects, activeProjectId, setActiveProject, playgroundInitialSQL, setPlaygroundInitialSQL, copilotContext, getSubscription, incrementAIGenerations } = useStore();
+  const {
+    aiAssistantOpen, setAiAssistantOpen, projects, activeProjectId, setActiveProject,
+    playgroundInitialSQL, setPlaygroundInitialSQL, copilotContext, getSubscription, incrementAIGenerations,
+    customColumns, globalPromptRules, autoApplyToAllTools,
+  } = useStore();
+  const activeCustomCols = (customColumns || []).filter((c) => c.enabled);
   const [input, setInput] = useState("");
   const [isLoading, setIsLoading] = useState(false);
   const [messages, setMessages] = useState<ChatMessage[]>([]);
@@ -355,6 +361,8 @@ export default function AIAssistantPanel() {
             input: query,
             schema: rawSQL,
             schemaContext: schemaContextString,
+            customColumns: autoApplyToAllTools ? activeCustomCols : [],
+            customRules: autoApplyToAllTools ? globalPromptRules : "",
           }),
         });
 
@@ -465,6 +473,17 @@ export default function AIAssistantPanel() {
               >
                 <X size={16} />
               </button>
+            </div>
+
+            {/* AI Credits Widget inside Panel */}
+            <div className="px-4 py-2 border-b border-[var(--border)] bg-[var(--surface)]">
+              <AICreditsWidget
+                variant="card"
+                onNavigate={(p) => {
+                  setAiAssistantOpen(false);
+                  window.dispatchEvent(new CustomEvent("navigate", { detail: p }));
+                }}
+              />
             </div>
 
             {/* Schema Context Status Indicator Banner */}

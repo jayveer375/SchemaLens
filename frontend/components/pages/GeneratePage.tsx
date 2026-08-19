@@ -11,9 +11,12 @@ import {
 } from "lucide-react";
 import { useStore } from "@/lib/store";
 import { parseSQLStats, downloadText, downloadJSON, genId, formatTime, cn } from "@/lib/utils";
+import { parseSQLSchema, generateMermaidFromSchema } from "@/lib/sqlParser";
 import { canConvert, conversionsLeft, canCreateProject, canGenerateAI, aiGenerationsLeft, getQuestionCreditCost } from "@/lib/subscription";
 import type { Project, DBType } from "@/lib/types";
 import UpgradeLimitDialog from "@/components/UpgradeLimitDialog";
+import { InlineDiagramViewer, type DiagramType } from "@/components/ERDiagramModal";
+import AICreditsWidget from "@/components/AICreditsWidget";
 import dynamic from "next/dynamic";
 import toast from "react-hot-toast";
 
@@ -117,12 +120,17 @@ interface GenerateResult {
 }
 
 export default function GeneratePage({ onNavigate }: { onNavigate: (p: string) => void }) {
-  const { getSubscription, incrementConversions, incrementAIGenerations, theme, user, projects, upsertProject, upsertFile, setActiveProject, setPlaygroundInitialSQL } = useStore();
+  const {
+    getSubscription, incrementConversions, incrementAIGenerations,
+    theme, user, projects, upsertProject, upsertFile, setActiveProject, setPlaygroundInitialSQL,
+    customColumns, globalPromptRules, autoApplyToAllTools,
+  } = useStore();
   const sub = getSubscription();
   const ownerId = user?.id ?? "";
   const myProjects = projects.filter(p => p.ownerId === ownerId);
   const canUseAI = canGenerateAI(sub);
   const aiCreditsLeft = aiGenerationsLeft(sub);
+  const activeCustomCols = (customColumns || []).filter((c) => c.enabled);
 
   const [description, setDescription]   = useState("");
   const [selectedDb, setSelectedDb]     = useState("postgresql");
@@ -133,6 +141,7 @@ export default function GeneratePage({ onNavigate }: { onNavigate: (p: string) =
   const [step, setStep]                 = useState(0);
   const [limitOpen, setLimitOpen]       = useState(false);
   const [activeTab, setActiveTab]       = useState<"diagram" | "sql">("diagram");
+  const [diagramViewMode, setDiagramViewMode] = useState<"interactive" | "mermaid">("interactive");
   const [showExamples, setShowExamples] = useState(false);
   const [mermaidSvg, setMermaidSvg]     = useState<string>("");
   const [mermaidError, setMermaidError] = useState(false);
@@ -158,19 +167,18 @@ export default function GeneratePage({ onNavigate }: { onNavigate: (p: string) =
   // ── Sanitize Mermaid syntax before rendering ──────────────────────────────
   function sanitizeMermaid(raw: string): string {
     let s = raw.trim();
+    // Strip markdown code fences
+    s = s.replace(/^```(?:mermaid)?/gim, "").replace(/^```/gim, "").trim();
+
     const lower = s.toLowerCase();
 
     // ── DFD (Level 0 / Level 1) — convert to flowchart ───────────────────
-    // Mermaid has no native DFD support; AI often generates custom syntax.
-    // We normalise it into a valid flowchart LR.
     if (lower.startsWith("dfd") || lower.startsWith("graph dfd") || lower.includes("dataflow")) {
-      // Strip any non-flowchart header line
       const lines = s.split("\n").filter(l => l.trim());
       const bodyLines = lines.filter(l =>
         !l.trim().toLowerCase().startsWith("dfd") &&
         !l.trim().toLowerCase().startsWith("dataflow")
       );
-      // Normalise arrows
       let body = bodyLines.join("\n")
         .replace(/—>/g, "-->").replace(/→/g, "-->").replace(/=>/g, "-->")
         .replace(/\[([^\]]*):([^\]]*)\]/g, (_, a, b) => `[${a.trim()} ${b.trim()}]`)
@@ -185,8 +193,12 @@ export default function GeneratePage({ onNavigate }: { onNavigate: (p: string) =
     }
 
     // ── Flowchart-specific fixes ───────────────────────────────────────────
-    if (!lower.startsWith("erdiagram")) {
+    if (lower.startsWith("flowchart") || lower.startsWith("graph") || diagramType === "flowchart" || diagramType === "dfd0" || diagramType === "dfd1") {
       s = s.replace(/^Flowchart\s/im, "flowchart ");
+      s = s.replace(/^graph\s+(td|tb|lr|rl)/im, "flowchart $1");
+      if (!s.toLowerCase().startsWith("flowchart")) {
+        s = `flowchart TD\n${s}`;
+      }
       s = s.replace(/—>/g, "-->").replace(/→/g, "-->").replace(/=>/g, "-->");
       s = s.replace(/-->\s*\|/g, "-->|");
       s = s.replace(/\[([^\]]*):([^\]]*)\]/g, (_, a, b) => `[${a.trim()} ${b.trim()}]`);
@@ -195,11 +207,12 @@ export default function GeneratePage({ onNavigate }: { onNavigate: (p: string) =
     }
 
     // ── ER Diagram fixes ───────────────────────────────────────────────────
-
-    // 1. Normalize keyword
     s = s.replace(/^er[_\-\s]?diagram/im, "erDiagram");
+    if (!s.toLowerCase().startsWith("erdiagram")) {
+      s = `erDiagram\n${s}`;
+    }
 
-    // 2. Map SQL types → Mermaid-safe types
+    // Map SQL types → Mermaid-safe types
     const typeMap: Record<string, string> = {
       "VARCHAR\\(\\d+\\)": "string",
       "NVARCHAR\\(\\d+\\)": "string",
@@ -216,6 +229,7 @@ export default function GeneratePage({ onNavigate }: { onNavigate: (p: string) =
       "BIGINT": "int",
       "SMALLINT": "int",
       "INTEGER": "int",
+      "INT": "int",
       "TINYINT\\(\\d+\\)": "int",
       "TINYINT": "int",
       "NUMERIC\\(\\d+,\\s*\\d+\\)": "float",
@@ -247,24 +261,18 @@ export default function GeneratePage({ onNavigate }: { onNavigate: (p: string) =
       s = s.replace(new RegExp(`\\b${pattern}\\b`, "gi"), replacement);
     }
 
-    // 3. Fix relationship labels — multi-word → single word (no spaces)
+    // Fix relationship labels
     s = s.replace(/:\s*"([^"]+)"/g, (_, label) => {
       const safe = label.trim().replace(/\s+/g, "_").replace(/[^a-zA-Z0-9_]/g, "");
       return `: "${safe || "has"}"`;
     });
-    // Also fix unquoted labels
     s = s.replace(/:\s+([a-zA-Z][a-zA-Z0-9 ]+)$/gm, (_, label) => {
       const safe = label.trim().replace(/\s+/g, "_");
       return `: "${safe}"`;
     });
 
-    // 4. Remove UK marker (not always supported) — keep PK and FK only
     s = s.replace(/\bUK\b/g, "");
-
-    // 5. Remove comments inside mermaid block
     s = s.replace(/^\s*--.*$/gm, "");
-
-    // 6. Remove blank lines
     s = s.split("\n").filter(l => l.trim() !== "").join("\n");
 
     return s;
@@ -272,35 +280,66 @@ export default function GeneratePage({ onNavigate }: { onNavigate: (p: string) =
 
   // ── Render Mermaid diagram ──────────────────────────────────────────────────
   useEffect(() => {
-    if (!result?.mermaid) return;
+    if (!result?.mermaid && !result?.sql) return;
     let cancelled = false;
     setMermaidError(false);
     setMermaidSvg("");
 
-    const cleaned = sanitizeMermaid(result.mermaid);
+    const cleaned = sanitizeMermaid(result?.mermaid || "");
 
-    import("mermaid").then((m) => {
+    import("mermaid").then(async (m) => {
       const mermaid = m.default;
       mermaid.initialize({
         startOnLoad: false,
+        suppressErrorRendering: true,
         theme: theme === "dark" ? "dark" : "default",
         er: { diagramPadding: 20, layoutDirection: "TB", minEntityWidth: 100 },
         flowchart: { curve: "basis", padding: 20, htmlLabels: true },
         securityLevel: "loose",
       });
-      const id = `mermaid-${genId()}`;
-      mermaid.render(id, cleaned)
-        .then(({ svg }) => {
-          if (!cancelled) setMermaidSvg(svg);
-        })
-        .catch((err) => {
-          console.warn("Mermaid render failed:", err?.message ?? err);
-          console.warn("Cleaned mermaid input:\n", cleaned);
-          if (!cancelled) setMermaidError(true);
-        });
+
+      const renderDiagram = async (code: string) => {
+        const id = `mermaid-${genId()}`;
+        return await mermaid.render(id, code);
+      };
+
+      try {
+        const { svg } = await renderDiagram(cleaned);
+        if (!cancelled) {
+          setMermaidSvg(svg);
+          setMermaidError(false);
+        }
+      } catch (err) {
+        console.warn("Primary Mermaid render failed, generating fallback from SQL...", err);
+        if (typeof document !== "undefined") {
+          document.querySelectorAll('[id^="dmermaid"]').forEach((el) => el.remove());
+        }
+
+        // Automatic fallback: build 100% compliant Mermaid diagram from SQL schema
+        if (result?.sql) {
+          try {
+            const parsedSchema = parseSQLSchema(result.sql);
+            const fallbackCode = generateMermaidFromSchema(parsedSchema, diagramType as any);
+            const { svg: fallbackSvg } = await renderDiagram(fallbackCode);
+            if (!cancelled) {
+              setMermaidSvg(fallbackSvg);
+              setMermaidError(false);
+              return;
+            }
+          } catch (fallbackErr) {
+            console.warn("Fallback Mermaid generation failed:", fallbackErr);
+            if (typeof document !== "undefined") {
+              document.querySelectorAll('[id^="dmermaid"]').forEach((el) => el.remove());
+            }
+          }
+        }
+
+        if (!cancelled) setMermaidError(true);
+      }
     });
+
     return () => { cancelled = true; };
-  }, [result?.mermaid, theme]);
+  }, [result?.mermaid, result?.sql, diagramType, theme]);
 
   // ── Step animation ──────────────────────────────────────────────────────────
   const runStepAnimation = useCallback(() => {
@@ -329,7 +368,13 @@ export default function GeneratePage({ onNavigate }: { onNavigate: (p: string) =
       const res = await fetch("/api/generate", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ description: description.trim(), dialect: selectedDb, diagramType }),
+        body: JSON.stringify({
+          description: description.trim(),
+          dialect: selectedDb,
+          diagramType,
+          customColumns: autoApplyToAllTools ? activeCustomCols : [],
+          customRules: autoApplyToAllTools ? globalPromptRules : "",
+        }),
       });
       const data = await res.json();
       stopAnim();
@@ -503,6 +548,8 @@ export default function GeneratePage({ onNavigate }: { onNavigate: (p: string) =
           mode: "generate",
           input: aiPrompt,
           schema: currentSQL,
+          customColumns: autoApplyToAllTools ? activeCustomCols : [],
+          customRules: autoApplyToAllTools ? globalPromptRules : "",
         }),
       });
 
@@ -531,7 +578,7 @@ export default function GeneratePage({ onNavigate }: { onNavigate: (p: string) =
     <div className="w-full px-1">
 
       {/* ── Header ── */}
-      <div className="flex items-start justify-between mb-8">
+      <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4 mb-8">
         <div>
           <div className="flex items-center gap-3 mb-2">
             <Wand2 size={22} className="text-primary-600" />
@@ -544,7 +591,12 @@ export default function GeneratePage({ onNavigate }: { onNavigate: (p: string) =
             &nbsp;remaining this month.
           </p>
         </div>
-        <div className="flex items-center gap-2">
+
+        <div className="flex items-center gap-3 flex-wrap">
+          <div className="w-full sm:w-60 flex-shrink-0">
+            <AICreditsWidget onNavigate={onNavigate} />
+          </div>
+
           <button
             onClick={() => setAiPanelOpen(!aiPanelOpen)}
             className={cn(
@@ -567,6 +619,24 @@ export default function GeneratePage({ onNavigate }: { onNavigate: (p: string) =
           )}
         </div>
       </div>
+
+      {/* Active Customization Indicator */}
+      {autoApplyToAllTools && activeCustomCols.length > 0 && (
+        <div className="mb-6 p-3 rounded-xl bg-primary-500/10 border border-primary-500/20 flex items-center justify-between gap-2">
+          <div className="flex items-center gap-2 text-xs text-primary-600 dark:text-primary-400 font-medium">
+            <Sparkles size={14} className="shrink-0" />
+            <span>
+              Customization Active: Applying <strong>{activeCustomCols.length} custom column{activeCustomCols.length !== 1 ? "s" : ""}</strong> ({activeCustomCols.map((c) => c.name).join(", ")}) into generated ER diagrams &amp; SQL DDL.
+            </span>
+          </div>
+          <button
+            onClick={() => onNavigate("settings")}
+            className="text-xs text-primary-600 dark:text-primary-400 underline hover:opacity-80 shrink-0"
+          >
+            Customize
+          </button>
+        </div>
+      )}
 
       {/* ── Diagram Type Selector ── */}
       <div className="mb-6">
@@ -991,52 +1061,85 @@ export default function GeneratePage({ onNavigate }: { onNavigate: (p: string) =
 
             {/* Tabs: Diagram / SQL */}
             <div className="card overflow-hidden">
-              <div className="flex items-center border-b border-[var(--border)]">
-                {(["diagram", "sql"] as const).map((tab) => (
-                  <button
-                    key={tab}
-                    onClick={() => setActiveTab(tab)}
-                    className={cn(
-                      "px-6 py-3.5 text-sm font-semibold transition-colors capitalize",
-                      activeTab === tab
-                        ? "text-primary-600 border-b-2 border-primary-600 -mb-px bg-primary-50 dark:bg-primary-900/20"
-                        : "text-[var(--text-muted)] hover:text-[var(--text)] hover:bg-[var(--surface)]"
-                    )}
-                  >
-                    {tab === "diagram"
-                      ? (DIAGRAM_TYPES.find(d => d.value === diagramType)?.label ?? "ER Diagram")
-                      : "SQL DDL"}
-                  </button>
-                ))}
+              <div className="flex items-center justify-between border-b border-[var(--border)] pr-4">
+                <div className="flex items-center">
+                  {(["diagram", "sql"] as const).map((tab) => (
+                    <button
+                      key={tab}
+                      onClick={() => setActiveTab(tab)}
+                      className={cn(
+                        "px-6 py-3.5 text-sm font-semibold transition-colors capitalize",
+                        activeTab === tab
+                          ? "text-primary-600 border-b-2 border-primary-600 -mb-px bg-primary-50 dark:bg-primary-900/20"
+                          : "text-[var(--text-muted)] hover:text-[var(--text)] hover:bg-[var(--surface)]"
+                      )}
+                    >
+                      {tab === "diagram"
+                        ? (DIAGRAM_TYPES.find(d => d.value === diagramType)?.label ?? "ER Diagram")
+                        : "SQL DDL"}
+                    </button>
+                  ))}
+                </div>
+
+                {activeTab === "diagram" && (
+                  <div className="flex items-center gap-1.5 bg-[var(--surface)] p-1 rounded-lg border border-[var(--border)] text-xs font-medium">
+                    <button
+                      onClick={() => setDiagramViewMode("interactive")}
+                      className={cn(
+                        "px-2.5 py-1 rounded-md transition-colors",
+                        diagramViewMode === "interactive"
+                          ? "bg-[var(--card)] text-[var(--text)] font-semibold shadow-xs"
+                          : "text-[var(--text-muted)] hover:text-[var(--text)]"
+                      )}
+                    >
+                      Interactive
+                    </button>
+                    <button
+                      onClick={() => setDiagramViewMode("mermaid")}
+                      className={cn(
+                        "px-2.5 py-1 rounded-md transition-colors",
+                        diagramViewMode === "mermaid"
+                          ? "bg-[var(--card)] text-[var(--text)] font-semibold shadow-xs"
+                          : "text-[var(--text-muted)] hover:text-[var(--text)]"
+                      )}
+                    >
+                      Mermaid SVG
+                    </button>
+                  </div>
+                )}
               </div>
 
               {/* Diagram tab */}
               {activeTab === "diagram" && (
-                <div className="p-5">
-                  {mermaidSvg ? (
+                <div className="p-4">
+                  {diagramViewMode === "interactive" ? (
+                    <InlineDiagramViewer
+                      sql={result.sql}
+                      diagramType={diagramType as DiagramType}
+                      theme={theme}
+                      minHeight={460}
+                    />
+                  ) : mermaidSvg ? (
                     <div
                       ref={diagramRef}
                       className="overflow-auto rounded-xl border border-[var(--border)] bg-white dark:bg-[var(--surface)] p-4"
-                      style={{ minHeight: 320 }}
+                      style={{ minHeight: 360 }}
                       dangerouslySetInnerHTML={{ __html: mermaidSvg }}
                     />
-                  ) : mermaidError ? (
-                    <div className="flex flex-col items-center gap-4 py-12 text-center">
-                      <AlertTriangle size={24} className="text-amber-500" />
-                      <div>
-                        <p className="text-sm font-semibold text-[var(--text)]">Diagram preview unavailable</p>
-                        <p className="text-xs text-[var(--text-muted)] mt-1">The Mermaid syntax may need a tweak. You can still copy/download the SQL.</p>
-                      </div>
-                      <details className="text-left w-full max-w-lg">
+                  ) : (
+                    <div className="space-y-4">
+                      <InlineDiagramViewer
+                        sql={result.sql}
+                        diagramType={diagramType as DiagramType}
+                        theme={theme}
+                        minHeight={460}
+                      />
+                      <details className="text-left w-full">
                         <summary className="text-xs text-primary-600 cursor-pointer font-medium">Show raw Mermaid syntax</summary>
-                        <pre className="mt-2 p-3 rounded-lg bg-[var(--surface)] text-xs text-[var(--text)] overflow-auto border border-[var(--border)] whitespace-pre-wrap">
+                        <pre className="mt-2 p-3 rounded-lg bg-[var(--surface)] text-xs text-[var(--text)] overflow-auto border border-[var(--border)] whitespace-pre-wrap font-mono">
                           {result.mermaid}
                         </pre>
                       </details>
-                    </div>
-                  ) : (
-                    <div className="flex items-center justify-center py-16">
-                      <div className="w-8 h-8 border-2 border-primary-500 border-t-transparent rounded-full animate-spin" />
                     </div>
                   )}
                 </div>

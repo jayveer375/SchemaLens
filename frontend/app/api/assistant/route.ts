@@ -89,6 +89,9 @@ RULES:
 User question: ${question}`;
 }
 
+import { buildCustomColumnsPrompt } from "@/lib/customization";
+import { CustomColumn } from "@/lib/types";
+
 // ─────────────────────────────────────────────────────────────────────────────
 // Main handler
 // ─────────────────────────────────────────────────────────────────────────────
@@ -104,25 +107,29 @@ export async function POST(req: NextRequest) {
     const input: string         = (body.input         ?? "").trim();
     const schema: string        = (body.schema        ?? "").trim();
     const schemaContext: string = (body.schemaContext  ?? "").trim();
+    const customColumns: CustomColumn[] = body.customColumns ?? [];
+    const customRules: string  = body.customRules ?? "";
 
     if (!mode) return NextResponse.json({ error: "mode is required" }, { status: 400 });
+
+    const customPrompt = buildCustomColumnsPrompt(customColumns, customRules);
 
     let prompt = "";
     if (mode === "explain") {
       if (!input) return NextResponse.json({ error: "SQL input is required for explain mode" }, { status: 400 });
       if (input.length > 5000) return NextResponse.json({ error: "SQL too long (max 5000 chars)" }, { status: 400 });
-      prompt = explainPrompt(input);
+      prompt = explainPrompt(input) + (customPrompt ? `\n\n${customPrompt}` : "");
     } else if (mode === "generate") {
       if (!input) return NextResponse.json({ error: "Request description is required" }, { status: 400 });
       if (input.length > 1000) return NextResponse.json({ error: "Request too long (max 1000 chars)" }, { status: 400 });
-      prompt = generatePrompt(input, schema);
+      prompt = generatePrompt(input, schema) + (customPrompt ? `\n\n${customPrompt}` : "");
     } else if (mode === "analyze") {
       if (!schema) return NextResponse.json({ error: "Schema is required for analyze mode" }, { status: 400 });
-      prompt = analyzePrompt(schema);
+      prompt = analyzePrompt(schema) + (customPrompt ? `\n\n${customPrompt}` : "");
     } else if (mode === "chat") {
       if (!input) return NextResponse.json({ error: "Question is required" }, { status: 400 });
       if (input.length > 2000) return NextResponse.json({ error: "Question too long (max 2000 chars)" }, { status: 400 });
-      prompt = chatPrompt(input, schema, schemaContext);
+      prompt = chatPrompt(input, schema, schemaContext) + (customPrompt ? `\n\n${customPrompt}` : "");
     } else {
       return NextResponse.json({ error: `Unknown mode: ${mode}` }, { status: 400 });
     }

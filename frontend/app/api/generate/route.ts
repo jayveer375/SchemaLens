@@ -1,4 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
+import { buildCustomColumnsPrompt } from "@/lib/customization";
+import { CustomColumn } from "@/lib/types";
 
 const MISTRAL_MODEL   = "mistral-small-latest";
 const MISTRAL_API_KEY = process.env.MISTRAL_API_KEY ?? "";
@@ -42,7 +44,7 @@ const DIALECT_RULES: Record<string, string> = {
 // ─────────────────────────────────────────────────────────────────────────────
 // DIAGRAM TYPE PROMPTS
 // ─────────────────────────────────────────────────────────────────────────────
-function buildPrompt(dialect: string, diagramType: string): string {
+function buildPrompt(dialect: string, diagramType: string, customPrompt: string = ""): string {
   const rules = DIALECT_RULES[dialect] ?? DIALECT_RULES.postgresql;
 
   // ── ER Diagram (default) ──────────────────────────────────────────────────
@@ -54,6 +56,8 @@ Produce TWO outputs:
 
 ════ DIALECT RULES ════
 ${rules}
+
+${customPrompt}
 
 ════ OUTPUT FORMAT — return ONLY valid JSON, no markdown, no prose ════
 {
@@ -298,6 +302,8 @@ export async function POST(req: NextRequest) {
     const description: string  = (body.description  ?? "").trim();
     const dialect: string      = (body.dialect       ?? "postgresql").toLowerCase();
     const diagramType: string  = (body.diagramType   ?? "er").toLowerCase();
+    const customColumns: CustomColumn[] = body.customColumns ?? [];
+    const customRules: string  = body.customRules ?? "";
 
     if (!description) {
       return NextResponse.json({ error: "No description provided" }, { status: 400 });
@@ -306,7 +312,8 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "Description too long (max 2000 characters)" }, { status: 400 });
     }
 
-    const prompt = buildPrompt(dialect, diagramType);
+    const customPrompt = buildCustomColumnsPrompt(customColumns, customRules);
+    const prompt = buildPrompt(dialect, diagramType, customPrompt);
 
     const ctrl  = new AbortController();
     const timer = setTimeout(() => ctrl.abort(), REQUEST_TIMEOUT);

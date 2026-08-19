@@ -122,15 +122,20 @@ CRITICAL SQLite rules — every single one must be obeyed:
 • Output ONLY raw Oracle DDL. No markdown, no prose.`,
 };
 
+import { buildCustomColumnsPrompt } from "@/lib/customization";
+import { CustomColumn } from "@/lib/types";
+
 // ─────────────────────────────────────────────────────────────────────────────
 // SHARED BASE PROMPT (visual extraction + fidelity rules)
 // ─────────────────────────────────────────────────────────────────────────────
-function buildPrompt(dialect: string): string {
+function buildPrompt(dialect: string, customPrompt: string = ""): string {
   const dialectRules = DIALECT_RULES[dialect] ?? DIALECT_RULES.postgresql;
 
-  return `You are a DDL generator. Your sole job is to transcribe exactly what is drawn in the ER diagram into valid, executable DDL for the specified target dialect. You must never use outside knowledge to add, infer, rename, or improve anything beyond what is literally visible in the image.
+  return `You are a DDL generator. Your sole job is to transcribe exactly what is drawn in the ER diagram into valid, executable DDL for the specified target dialect. You must never use outside knowledge to add, infer, rename, or improve anything beyond what is literally visible in the image except as explicitly mandated by User Customization Rules below.
 
 ${dialectRules}
+
+${customPrompt}
 
 ════════════════════════════════════════════════════════════════════
 PHASE 1 — VISUAL EXTRACTION  (internal reasoning only, no output)
@@ -181,14 +186,13 @@ F2. Every FK must reference a table and column that exist in the same output scr
 F3. NOT NULL on a FK column only if the relationship line is drawn as a double line.
 F4. Follow the FK placement rules (inline vs ALTER TABLE) stated in the dialect section above.
 
-━━━ DIAGRAM FIDELITY RULES ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+━━━ DIAGRAM FIDELITY & CUSTOM COLUMNS RULES ━━━━━━━━━━━━━━━━━━━━━━
 
-D1. One TABLE per visible entity box — no more, no fewer.
-D2. One COLUMN per visible attribute oval connected to that entity — no more, no fewer.
+D1. One TABLE per visible entity box.
+D2. Columns: Include all visible attribute ovals connected to that entity, PLUS any enabled User Custom Columns specified in the customization section above when relevant to the tables.
 D3. Copy the EXACT text visible in the diagram for every name. Do not fix spelling,
     change case, expand abbreviations, or pluralise. OCR what you see literally.
-D4. Do not add any column, table, constraint, index, trigger, sequence, or comment
-    that is not directly derivable from a visible diagram element.
+D4. Apply the User Customization Columns and Directives to the generated tables.
 
 ════════════════════════════════════════════════════════════════════
 PHASE 3 — UNCERTAIN ELEMENTS
@@ -218,6 +222,8 @@ export async function POST(req: NextRequest) {
     const form = await req.formData();
     const file    = form.get("image")   as File   | null;
     const dialect = (form.get("dialect") as string | null)?.toLowerCase() ?? "postgresql";
+    const customColsRaw = form.get("customColumns") as string | null;
+    const customRulesRaw = form.get("customRules") as string | null;
 
     if (!file) {
       return NextResponse.json({ error: "No image provided" }, { status: 400 });
@@ -231,12 +237,22 @@ export async function POST(req: NextRequest) {
       );
     }
 
+    let customPrompt = "";
+    if (customColsRaw || customRulesRaw) {
+      try {
+        const cols: CustomColumn[] = customColsRaw ? JSON.parse(customColsRaw) : [];
+        customPrompt = buildCustomColumnsPrompt(cols, customRulesRaw || "");
+      } catch (e) {
+        console.warn("Failed to parse customColumns in analyze:", e);
+      }
+    }
+
     // Convert file to base64
     const bytes    = await file.arrayBuffer();
     const b64      = Buffer.from(bytes).toString("base64");
     const mimeType = file.type === "image/svg+xml" ? "image/png" : file.type;
 
-    const prompt = buildPrompt(dialect);
+    const prompt = buildPrompt(dialect, customPrompt);
 
     const t0   = Date.now();
     const ctrl = new AbortController();

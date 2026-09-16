@@ -22,7 +22,7 @@ from google.oauth2 import id_token as google_id_token
 from google.auth.transport import requests as google_requests
 
 from database import get_db
-from models import User, Image, Conversion, ApiUsage, ExportLog, UserActivity, ProjectImage
+from models import User, Image, Conversion, ApiUsage, ExportLog, UserActivity, ProjectImage, PasswordResetOTP
 from utils.activity_logger import log_activity, log_activity_bg, log_login_success_bg
 from utils.file_storage import save_uploaded_image
 
@@ -476,16 +476,22 @@ def send_password_reset_otp(payload: dict, request: Request, db: Session = Depen
     if not user:
         raise HTTPException(status_code=404, detail="No account found with this email address")
     
-    # Generate OTP and store with expiration (10 minutes)
+    # Delete any existing OTPs for this user (cleanup)
+    db.query(PasswordResetOTP).filter(PasswordResetOTP.email == email).delete()
+    
+    # Generate OTP and store in database with expiration (10 minutes)
     otp = generate_otp()
     expiry = datetime.datetime.utcnow() + datetime.timedelta(minutes=10)
     
-    otp_storage[email] = {
-        "otp": otp,
-        "expiry": expiry,
-        "user_id": user.id,
-        "verified": False
-    }
+    otp_record = PasswordResetOTP(
+        user_id=user.id,
+        email=email,
+        otp_code=otp,
+        verified=False,
+        expires_at=expiry
+    )
+    db.add(otp_record)
+    db.commit()
     
     # Send OTP via email
     if send_email_otp(email, otp):
@@ -495,30 +501,34 @@ def send_password_reset_otp(payload: dict, request: Request, db: Session = Depen
 
 # ── Verify OTP ────────────────────────────────────────────────────────────────
 @app.post("/forgot-password/verify-otp")
-def verify_password_reset_otp(payload: dict, request: Request):
+def verify_password_reset_otp(payload: dict, request: Request, db: Session = Depends(get_db)):
     email = payload.get("email", "").strip().lower()
     otp = payload.get("otp", "").strip()
     
     if not email or not otp:
         raise HTTPException(status_code=400, detail="Email and OTP are required")
     
-    # Check if OTP exists
-    if email not in otp_storage:
+    # Check if OTP exists in database
+    otp_record = db.query(PasswordResetOTP).filter(
+        PasswordResetOTP.email == email
+    ).order_by(PasswordResetOTP.created_at.desc()).first()
+    
+    if not otp_record:
         raise HTTPException(status_code=400, detail="No OTP found for this email")
     
-    otp_data = otp_storage[email]
-    
     # Check if OTP is expired
-    if datetime.datetime.utcnow() > otp_data["expiry"]:
-        del otp_storage[email]
+    if datetime.datetime.utcnow() > otp_record.expires_at:
+        db.delete(otp_record)
+        db.commit()
         raise HTTPException(status_code=400, detail="OTP has expired. Please request a new one.")
     
     # Check if OTP matches
-    if otp != otp_data["otp"]:
+    if otp != otp_record.otp_code:
         raise HTTPException(status_code=400, detail="Invalid OTP")
     
     # Mark OTP as verified
-    otp_storage[email]["verified"] = True
+    otp_record.verified = True
+    db.commit()
     
     return {"message": "OTP verified successfully", "email": email}
 
@@ -534,18 +544,23 @@ def reset_password_with_otp(payload: dict, request: Request, background_tasks: B
     if len(new_password) < 8:
         raise HTTPException(status_code=400, detail="Password must be at least 8 characters")
     
-    # Check if OTP was verified
-    if email not in otp_storage or not otp_storage[email].get("verified", False):
+    # Check if OTP was verified in database
+    otp_record = db.query(PasswordResetOTP).filter(
+        PasswordResetOTP.email == email,
+        PasswordResetOTP.verified == True
+    ).order_by(PasswordResetOTP.created_at.desc()).first()
+    
+    if not otp_record:
         raise HTTPException(status_code=400, detail="OTP not verified. Please verify OTP first.")
     
     # Check if OTP is still valid (not expired)
-    otp_data = otp_storage[email]
-    if datetime.datetime.utcnow() > otp_data["expiry"]:
-        del otp_storage[email]
+    if datetime.datetime.utcnow() > otp_record.expires_at:
+        db.delete(otp_record)
+        db.commit()
         raise HTTPException(status_code=400, detail="OTP has expired. Please start over.")
     
     # Get user and update password
-    user = db.query(User).filter(User.id == otp_data["user_id"]).first()
+    user = db.query(User).filter(User.id == otp_record.user_id).first()
     if not user:
         raise HTTPException(status_code=404, detail="User not found")
     
@@ -553,8 +568,9 @@ def reset_password_with_otp(payload: dict, request: Request, background_tasks: B
     user.password_hash = bcrypt.hashpw(new_password.encode(), bcrypt.gensalt()).decode()
     db.commit()
     
-    # Clean up OTP
-    del otp_storage[email]
+    # Clean up OTP from database
+    db.delete(otp_record)
+    db.commit()
     
     # Log activity
     background_tasks.add_task(

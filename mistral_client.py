@@ -58,12 +58,14 @@ def analyze_image(
     base64_image: str,
     prompt: str = config.DEFAULT_PROMPT,
     media_type: str = "image/png",
+    max_retries: int = 3,
 ) -> AnalysisResult:
     """
     Sends one image to the Mistral vision model and returns the result.
 
     base64_image  : base64-encoded image bytes (PNG preferred)
     media_type    : MIME type matching the encoded image (image/png or image/jpeg)
+    max_retries   : number of retry attempts for rate limit errors
     """
     payload = {
         "model": config.MODEL,
@@ -89,59 +91,94 @@ def analyze_image(
     log.info(f"[SENT] '{filename}' -> dispatching to Mistral model '{config.MODEL}'")
     start_time = time.time()
 
-    try:
-        response = requests.post(
-            config.MISTRAL_API_URL,
-            headers=_build_headers(),
-            json=payload,
-            timeout=config.REQUEST_TIMEOUT,
-        )
-        response.raise_for_status()
+    # Retry logic with exponential backoff for rate limits
+    for attempt in range(max_retries):
+        try:
+            response = requests.post(
+                config.MISTRAL_API_URL,
+                headers=_build_headers(),
+                json=payload,
+                timeout=config.REQUEST_TIMEOUT,
+            )
+            
+            # Handle rate limit specifically
+            if response.status_code == 429:
+                retry_after = response.headers.get('retry-after', 60)
+                try:
+                    wait_time = int(retry_after)
+                except (ValueError, TypeError):
+                    wait_time = 60 * (attempt + 1)  # Exponential backoff
+                
+                if attempt < max_retries - 1:
+                    log.warning(
+                        f"[RATE LIMIT] '{filename}' -> attempt {attempt + 1}/{max_retries}, "
+                        f"waiting {wait_time}s before retry"
+                    )
+                    time.sleep(wait_time)
+                    continue
+                else:
+                    msg = (
+                        f"Rate limit exceeded after {max_retries} attempts. "
+                        f"Please wait and try again later, or upgrade your Mistral API plan."
+                    )
+                    log.error(f"[FAILED] '{filename}' -> {msg}")
+                    return AnalysisResult(False, filename, error=msg)
+            
+            response.raise_for_status()
 
-        log.info(f"[ACCEPTED] '{filename}' -> Mistral returned HTTP 200, parsing response")
+            log.info(f"[ACCEPTED] '{filename}' -> Mistral returned HTTP 200, parsing response")
 
-        data = response.json()
-        choices = data.get("choices", [])
-        if not choices:
-            msg = "Mistral returned no choices in the response"
+            data = response.json()
+            choices = data.get("choices", [])
+            if not choices:
+                msg = "Mistral returned no choices in the response"
+                log.error(f"[FAILED] '{filename}' -> {msg}")
+                return AnalysisResult(False, filename, error=msg)
+
+            description = choices[0].get("message", {}).get("content", "").strip()
+            duration = time.time() - start_time
+
+            if not description:
+                msg = "Mistral returned an empty content field"
+                log.error(f"[FAILED] '{filename}' -> {msg}")
+                return AnalysisResult(False, filename, error=msg, duration_seconds=duration)
+
+            log.info(
+                f"[COMPLETED] '{filename}' -> analysis received in {duration:.1f}s "
+                f"({len(description)} chars)"
+            )
+            return AnalysisResult(True, filename, description=description, duration_seconds=duration)
+
+        except requests.exceptions.Timeout:
+            msg = f"Request timed out after {config.REQUEST_TIMEOUT}s"
             log.error(f"[FAILED] '{filename}' -> {msg}")
             return AnalysisResult(False, filename, error=msg)
 
-        description = choices[0].get("message", {}).get("content", "").strip()
-        duration = time.time() - start_time
-
-        if not description:
-            msg = "Mistral returned an empty content field"
+        except requests.exceptions.ConnectionError as e:
+            msg = f"Could not connect to Mistral API: {e}"
             log.error(f"[FAILED] '{filename}' -> {msg}")
-            return AnalysisResult(False, filename, error=msg, duration_seconds=duration)
+            return AnalysisResult(False, filename, error=msg)
 
-        log.info(
-            f"[COMPLETED] '{filename}' -> analysis received in {duration:.1f}s "
-            f"({len(description)} chars)"
-        )
-        return AnalysisResult(True, filename, description=description, duration_seconds=duration)
+        except requests.exceptions.HTTPError as e:
+            # Check if it's a rate limit error that wasn't caught above
+            if e.response.status_code == 429:
+                continue  # Retry
+            
+            body = ""
+            try:
+                body = e.response.text[:300]
+            except Exception:
+                pass
+            msg = f"Mistral returned HTTP error: {e} | {body}"
+            log.error(f"[FAILED] '{filename}' -> {msg}")
+            return AnalysisResult(False, filename, error=msg)
 
-    except requests.exceptions.Timeout:
-        msg = f"Request timed out after {config.REQUEST_TIMEOUT}s"
-        log.error(f"[FAILED] '{filename}' -> {msg}")
-        return AnalysisResult(False, filename, error=msg)
-
-    except requests.exceptions.ConnectionError as e:
-        msg = f"Could not connect to Mistral API: {e}"
-        log.error(f"[FAILED] '{filename}' -> {msg}")
-        return AnalysisResult(False, filename, error=msg)
-
-    except requests.exceptions.HTTPError as e:
-        body = ""
-        try:
-            body = e.response.text[:300]
-        except Exception:
-            pass
-        msg = f"Mistral returned HTTP error: {e} | {body}"
-        log.error(f"[FAILED] '{filename}' -> {msg}")
-        return AnalysisResult(False, filename, error=msg)
-
-    except Exception as e:  # noqa: BLE001
-        msg = f"Unexpected error: {e}"
-        log.error(f"[FAILED] '{filename}' -> {msg}")
-        return AnalysisResult(False, filename, error=msg)
+        except Exception as e:  # noqa: BLE001
+            msg = f"Unexpected error: {e}"
+            log.error(f"[FAILED] '{filename}' -> {msg}")
+            return AnalysisResult(False, filename, error=msg)
+    
+    # If we get here, all retries failed
+    msg = "All retry attempts exhausted"
+    log.error(f"[FAILED] '{filename}' -> {msg}")
+    return AnalysisResult(False, filename, error=msg)

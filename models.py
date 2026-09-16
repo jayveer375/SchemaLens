@@ -281,7 +281,31 @@ class ToolHistory(Base):
 
 
 # ─────────────────────────────────────────────────────────────────────────────
-# TABLE 11: project_images
+# TABLE 11: password_reset_otps
+# OTP tokens for password reset (persisted to survive server restarts).
+# Visible in pgAdmin:
+#   SELECT o.id, u.full_name, u.email, o.otp_code, o.verified, o.expires_at
+#   FROM password_reset_otps o
+#   JOIN users u ON o.user_id = u.id
+#   ORDER BY o.created_at DESC;
+# ─────────────────────────────────────────────────────────────────────────────
+class PasswordResetOTP(Base):
+    __tablename__ = "password_reset_otps"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    user_id: Mapped[int] = mapped_column(Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True)
+    email: Mapped[str] = mapped_column(String(255), nullable=False, index=True)
+    otp_code: Mapped[str] = mapped_column(String(10), nullable=False)
+    verified: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
+    created_at: Mapped[datetime.datetime] = mapped_column(DateTime, server_default=func.now(), nullable=False)
+    expires_at: Mapped[datetime.datetime] = mapped_column(DateTime, nullable=False)
+
+    # Relationship
+    user: Mapped["User"] = relationship("User")
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# TABLE 12: project_images
 # ER diagram images uploaded inside a project workspace.
 # Stores image as base64 data URL so it survives page reloads.
 # Visible in pgAdmin:

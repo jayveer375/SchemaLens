@@ -48,12 +48,14 @@ function backendToFrontendUser(bu: {
   created_at?: string;
   last_login?: string | null;
   conversions_used_this_month: number;
+  subscription?: any;  // Backend now returns subscription object
 }): User {
   return {
     id: String(bu.id),
     name: bu.full_name,
     email: bu.email,
     role: bu.role as "user" | "admin",
+    plan: (bu.plan || "free") as "free" | "pro" | "ultimate",  // CRITICAL FIX: Use actual plan from DB
     // Use real DB timestamps so "Member since" and "Last login" are correct
     createdAt: bu.created_at ? new Date(bu.created_at).getTime() : Date.now(),
     lastLogin: bu.last_login ? new Date(bu.last_login).getTime() : undefined,
@@ -61,13 +63,13 @@ function backendToFrontendUser(bu: {
     suspended: false,
     // Restore saved avatar so profile photo survives re-login
     avatar: bu.avatar ?? undefined,
-    subscription: {
-      planId: (bu.plan === "pro" ? "pro" : "free"),
+    // CRITICAL FIX: Use subscription from backend if available, otherwise build from plan
+    subscription: bu.subscription || {
+      planId: (bu.plan || "free") as "free" | "pro" | "ultimate",
       startedAt: Date.now(),
       renewsAt: Date.now() + 30 * 24 * 60 * 60 * 1000,
-      // Restore real usage count from DB so dashboard stats are correct
       conversionsUsedThisMonth: bu.conversions_used_this_month,
-      aiGenerationsUsedThisMonth: 0, // Initialize AI generations to 0
+      aiGenerationsUsedThisMonth: 0,
       lastResetMonth: new Date().toISOString().slice(0, 7),
     },
   };

@@ -845,8 +845,15 @@ def record_payment(payload: dict, request: Request, background_tasks: Background
     if not user:
         raise HTTPException(status_code=404, detail="User not found")
 
-    # Upgrade the plan
-    user.plan = plan_purchased if plan_purchased in ("free", "pro") else "pro"
+    # Upgrade the plan - now supports 'free', 'pro', and 'ultimate'
+    valid_plans = ("free", "pro", "ultimate")
+    new_plan = plan_purchased if plan_purchased in valid_plans else "pro"
+    
+    print(f"[PAYMENT] User {user_id} upgrading from '{user.plan}' to '{new_plan}'")
+    
+    user.plan = new_plan
+    db.add(user)  # Mark user for update
+    db.flush()  # Flush user update to get any DB errors immediately
 
     # Insert payment record
     payment = Payment(
@@ -861,8 +868,12 @@ def record_payment(payload: dict, request: Request, background_tasks: Background
         verified_at=datetime.datetime.utcnow(),
     )
     db.add(payment)
-    db.commit()
+    db.commit()  # Commit both user plan update and payment record atomically
+    db.refresh(user)
     db.refresh(payment)
+    
+    print(f"[PAYMENT] User {user_id} plan now: '{user.plan}' (confirmed from DB)")
+    print(f"[PAYMENT] Payment ID: {payment.id}, Plan purchased: '{payment.plan_purchased}'")  
 
     background_tasks.add_task(
         log_activity_bg, "upgrade", user_id=user_id,
@@ -1195,8 +1206,8 @@ def admin_suspend_user(user_id: int, payload: dict, request: Request, db: Sessio
 @app.put("/admin/users/{user_id}/plan")
 def admin_change_plan(user_id: int, payload: dict, request: Request, db: Session = Depends(get_db)):
     plan = payload.get("plan", "free")
-    if plan not in ("free", "pro"):
-        raise HTTPException(status_code=400, detail="plan must be 'free' or 'pro'")
+    if plan not in ("free", "pro", "ultimate"):
+        raise HTTPException(status_code=400, detail="plan must be 'free', 'pro', or 'ultimate'")
     user = db.query(User).filter(User.id == user_id).first()
     if not user:
         raise HTTPException(status_code=404, detail="User not found")
@@ -1260,8 +1271,9 @@ def admin_stats(db: Session = Depends(get_db)):
     total_users       = db.query(User).count()
     active_users      = db.query(User).filter(User.is_active == True).count()
     suspended_users   = db.query(User).filter(User.is_active == False).count()
-    pro_users         = db.query(User).filter(User.plan == "pro").count()
     free_users        = db.query(User).filter(User.plan == "free").count()
+    pro_users         = db.query(User).filter(User.plan == "pro").count()
+    ultimate_users    = db.query(User).filter(User.plan == "ultimate").count()
     total_projects    = db.query(ProjectModel).count()
     total_conversions = db.query(ConversionModel).count()
     successful_conv   = db.query(ConversionModel).filter(ConversionModel.success == True).count()
@@ -1273,8 +1285,9 @@ def admin_stats(db: Session = Depends(get_db)):
         "total_users": total_users,
         "active_users": active_users,
         "suspended_users": suspended_users,
-        "pro_users": pro_users,
         "free_users": free_users,
+        "pro_users": pro_users,
+        "ultimate_users": ultimate_users,
         "total_projects": total_projects,
         "total_conversions": total_conversions,
         "successful_conversions": successful_conv,
@@ -1335,6 +1348,20 @@ def admin_delete_project(project_uid: str, request: Request, db: Session = Depen
 
 # ── Helpers ───────────────────────────────────────────────────────────────────
 def _user_dict(u: User) -> dict:
+    """
+    Convert a User model to a dictionary for API responses.
+    Includes a subscription object that maps the database plan to frontend format.
+    """
+    # Map database plan to frontend subscription object
+    subscription = {
+        "planId": u.plan,  # 'free' | 'pro' | 'ultimate'
+        "startedAt": int(u.created_at.timestamp() * 1000) if u.created_at else 0,
+        "renewsAt": int(u.created_at.timestamp() * 1000) + (30 * 24 * 60 * 60 * 1000) if u.created_at else 0,
+        "conversionsUsedThisMonth": u.conversions_used_this_month,
+        "aiGenerationsUsedThisMonth": 0,  # This can be tracked separately if needed
+        "lastResetMonth": f"{datetime.datetime.now().year}-{str(datetime.datetime.now().month).zfill(2)}",
+    }
+    
     return {
         "id": u.id,
         "full_name": u.full_name,
@@ -1348,6 +1375,7 @@ def _user_dict(u: User) -> dict:
         "last_login": str(u.last_login) if u.last_login else None,
         "conversions_used_this_month": u.conversions_used_this_month,
         "is_google_user": bool(getattr(u, "google_id", None)),
+        "subscription": subscription,  # Frontend expects this
     }
 
 def _project_dict(p) -> dict:

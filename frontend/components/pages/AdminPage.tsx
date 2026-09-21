@@ -95,7 +95,7 @@ export default function AdminPage() {
     } catch (e: any) { toast.error(e.message); }
   };
 
-  const handlePlanChange = async (u: AdminUserRecord, plan: "free" | "pro") => {
+  const handlePlanChange = async (u: AdminUserRecord, plan: "free" | "pro" | "ultimate") => {
     try {
       const res = await apiAdminChangePlan(u.id, plan);
       setUsers(prev => prev.map(x => x.id === u.id ? { ...x, plan: res.user.plan } : x));
@@ -335,8 +335,10 @@ export default function AdminPage() {
                         </div>
                       </td>
                       <td className="px-5">
-                        <span className={cn("badge text-sm", u.plan === "pro" ? "bg-amber-50 dark:bg-amber-500/10 text-amber-600" : "badge-gray")}>
-                          {u.plan === "pro" ? "Pro" : "Free"}
+                        <span className={cn("badge text-sm", 
+                          u.plan === "ultimate" ? "bg-purple-50 dark:bg-purple-500/10 text-purple-600" :
+                          u.plan === "pro" ? "bg-amber-50 dark:bg-amber-500/10 text-amber-600" : "badge-gray")}>
+                          {u.plan === "ultimate" ? "Ultimate" : u.plan === "pro" ? "Pro" : "Free"}
                         </span>
                       </td>
                       <td className="px-5">
@@ -484,8 +486,10 @@ function UserDetail({ user, projects, adminId, onBack, onSuspend, onPlanChange, 
         <div className="flex-1 min-w-0">
           <div className="flex flex-wrap items-center gap-2">
             <h1 className="text-xl font-bold text-[var(--text)]">{user.full_name}</h1>
-            <span className={cn("badge text-xs", user.plan === "pro" ? "bg-amber-50 dark:bg-amber-500/10 text-amber-600" : "badge-gray")}>
-              {user.plan === "pro" ? "Pro" : "Free"}
+            <span className={cn("badge text-xs", 
+              user.plan === "ultimate" ? "bg-purple-50 dark:bg-purple-500/10 text-purple-600" :
+              user.plan === "pro" ? "bg-amber-50 dark:bg-amber-500/10 text-amber-600" : "badge-gray")}>
+              {user.plan === "ultimate" ? "Ultimate" : user.plan === "pro" ? "Pro" : "Free"}
             </span>
             <span className={cn("badge text-sm", user.is_active ? "badge-success" : "badge-danger")}>
               {user.is_active ? "Active" : "Suspended"}
@@ -558,9 +562,10 @@ function UserDetail({ user, projects, adminId, onBack, onSuspend, onPlanChange, 
             <div className="space-y-4">
               <div>
                 <label className="block text-base font-semibold text-[var(--text-muted)] mb-1.5">Plan</label>
-                <select value={user.plan} onChange={e => onPlanChange(e.target.value as "free" | "pro")} className="admin-select">
+                <select value={user.plan} onChange={e => onPlanChange(e.target.value as "free" | "pro" | "ultimate")} className="admin-select">
                   <option value="free">Free</option>
                   <option value="pro">Pro</option>
+                  <option value="ultimate">Ultimate</option>
                 </select>
               </div>
               <div>

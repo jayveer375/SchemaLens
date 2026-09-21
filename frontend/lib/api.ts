@@ -281,7 +281,7 @@ export async function apiAdminSuspendUser(userId: number, suspend: boolean) {
   });
 }
 
-export async function apiAdminChangePlan(userId: number, plan: "free" | "pro") {
+export async function apiAdminChangePlan(userId: number, plan: "free" | "pro" | "ultimate") {
   return request<{ message: string; user: BackendUser }>(`/admin/users/${userId}/plan`, {
     method: "PUT", body: JSON.stringify({ plan }),
   });

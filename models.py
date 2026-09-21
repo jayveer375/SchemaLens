@@ -29,7 +29,7 @@ class User(Base):
     email: Mapped[str] = mapped_column(String(255), unique=True, nullable=False, index=True)
     password_hash: Mapped[str] = mapped_column(String(255), nullable=False)
     role: Mapped[str] = mapped_column(String(20), default="user", nullable=False)        # 'user' or 'admin'
-    plan: Mapped[str] = mapped_column(String(20), default="free", nullable=False)        # 'free' or 'pro'
+    plan: Mapped[str] = mapped_column(String(20), default="free", nullable=False)        # 'free' | 'pro' | 'ultimate'
     is_active: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
     email_verified: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
     created_at: Mapped[datetime.datetime] = mapped_column(DateTime, server_default=func.now(), nullable=False)

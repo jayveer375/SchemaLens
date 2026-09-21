@@ -44,6 +44,7 @@ export interface User {
   email: string;
   avatar?: string;
   role: UserRole;
+  plan: PlanId;  // Added: matches backend user.plan field
   createdAt: number;
   lastLogin?: number;
   emailVerified: boolean;

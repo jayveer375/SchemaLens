@@ -140,8 +140,15 @@ export const useStore = create<Store>()(
       setUser: (user) => set({
         user,
         isAuthenticated: !!user,
-        // Restore subscription from the user object (carries DB conversions count on login)
-        ...(user?.subscription ? { subscription: user.subscription } : {}),
+        // CRITICAL: Always sync subscription from user object (database)
+        subscription: user?.subscription ? {
+          planId: user.subscription.planId || user.plan || "free",
+          startedAt: user.subscription.startedAt || Date.now(),
+          renewsAt: user.subscription.renewsAt || Date.now() + 30 * 24 * 60 * 60 * 1000,
+          conversionsUsedThisMonth: user.subscription.conversionsUsedThisMonth || 0,
+          aiGenerationsUsedThisMonth: user.subscription.aiGenerationsUsedThisMonth || 0,
+          lastResetMonth: user.subscription.lastResetMonth || `${new Date().getFullYear()}-${String(new Date().getMonth() + 1).padStart(2, '0')}`,
+        } : defaultSubscription(),
       }),
       setToken: (token) => set({ token }),
       logout: () =>

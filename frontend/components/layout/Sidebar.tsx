@@ -18,6 +18,7 @@ const toolsItems = [
   { id: "quick-convert", label: "Quick Convert", icon: Sparkles,      badge: "Image → SQL" },
   { id: "generate",      label: "Generate",      icon: Wand2,          badge: "Text → SQL"  },
   { id: "migrate",       label: "Migrator",      icon: ArrowRightLeft, badge: "SQL → SQL"   },
+  { id: "d2d",           label: "D2D",           icon: Database,       badge: "Doc → Diagram" },
   { id: "playground",    label: "Playground",    icon: Terminal,       badge: "SQL Editor"  },
   { id: "assistant",     label: "AI Assistant",  icon: Bot,            badge: "Ask AI"      },
 ];
@@ -82,13 +83,13 @@ export default function Sidebar({ page, onNavigate }: SidebarProps) {
 
   const [mobileOpen, setMobileOpen] = useState(true);
   const [toolsOpen, setToolsOpen] = useState(
-    ["quick-convert", "generate", "migrate", "playground", "assistant"].includes(page)
+    ["quick-convert", "generate", "migrate", "d2d", "playground", "assistant"].includes(page)
   );
 
   const projects = allProjects.filter(p => p.ownerId === (user?.id ?? ""));
   const isAdmin = user?.role === "admin";
   const width = sidebarCollapsed ? 72 : 248;
-  const isToolPage = ["quick-convert", "generate", "migrate", "playground", "assistant"].includes(page);
+  const isToolPage = ["quick-convert", "generate", "migrate", "d2d", "playground", "assistant"].includes(page);
 
   const handleNavigate = (id: string) => {
     onNavigate(id);

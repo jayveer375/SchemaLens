@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 
-const MISTRAL_MODEL   = "mistral-small-latest";
+const MISTRAL_MODEL   = "mistral-tiny";
 const MISTRAL_API_KEY = process.env.MISTRAL_API_KEY ?? "";
 const MISTRAL_API_URL = "https://api.mistral.ai/v1/chat/completions";
 const REQUEST_TIMEOUT = 120_000;
@@ -269,6 +269,7 @@ export async function POST(req: NextRequest) {
           ],
         },
       ],
+      max_tokens: 2000,  // Limit tokens to save quota
     };
 
     const res = await fetch(MISTRAL_API_URL, {
@@ -282,8 +283,11 @@ export async function POST(req: NextRequest) {
     });
     clearTimeout(timer);
 
+    console.log(`Mistral API response: ${res.status} ${res.statusText}`);
+
     if (!res.ok) {
       const txt = await res.text().catch(() => "");
+      console.error(`Mistral API error: ${res.status} - ${txt}`);
       return NextResponse.json(
         { error: `Mistral API error ${res.status}: ${txt.slice(0, 200)}` },
         { status: res.status }
@@ -305,9 +309,20 @@ export async function POST(req: NextRequest) {
     });
 
   } catch (err: any) {
+    // clearTimeout(timer); // Remove this line - timer not in scope
+    
     if (err?.name === "AbortError") {
       return NextResponse.json({ error: "Request timed out (120s)" }, { status: 408 });
     }
+    
+    // Network connectivity issues
+    if (err?.code === "ENOTFOUND" || err?.code === "ECONNREFUSED" || err?.message?.includes("fetch")) {
+      console.error("Network error connecting to Mistral API:", err);
+      return NextResponse.json({ 
+        error: "Network error: Unable to connect to Mistral AI service. Please check your internet connection." 
+      }, { status: 503 });
+    }
+    
     console.error("analyze route error:", err);
     return NextResponse.json({ error: err?.message ?? "Unknown error" }, { status: 500 });
   }

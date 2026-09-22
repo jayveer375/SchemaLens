@@ -28,6 +28,7 @@ import PlaygroundPage from "@/app/playground/page";
 import AssistantPage from "@/components/pages/AssistantPage";
 import ProfilePage from "@/components/pages/ProfilePage";
 import UsagePage from "@/components/pages/UsagePage";
+import D2DPage from "@/components/pages/D2DPage";
 import AIAssistantPanel from "@/components/AIAssistantPanel";
 
 import { useStore } from "@/lib/store";
@@ -37,13 +38,14 @@ import { LayoutDashboard, FolderOpen, History, Settings, Shield } from "lucide-r
 const DatabaseScene = dynamic(() => import("@/components/ambient/DatabaseScene"), { ssr: false });
 
 type AuthPage = "login" | "register" | "forgot" | "setPassword";
-type AppPage  = "dashboard" | "projects" | "project-detail" | "history" | "quick-convert" | "generate" | "migrate" | "playground" | "assistant" | "pricing" | "profile" | "usage" | "settings" | "admin";
+type AppPage  = "dashboard" | "projects" | "project-detail" | "history" | "quick-convert" | "generate" | "migrate" | "d2d" | "playground" | "assistant" | "pricing" | "profile" | "usage" | "settings" | "admin";
 
 export default function RootPage() {
   const { isAuthenticated, user, sidebarCollapsed } = useStore();
   const [mounted, setMounted] = useState(false);
   const [authPage, setAuthPage] = useState<AuthPage>("login");
   const [appPage, setAppPage] = useState<AppPage>("dashboard");
+  const [prevPage, setPrevPage] = useState<AppPage | null>(null);
 
   useEffect(() => {
     setMounted(true);
@@ -63,6 +65,24 @@ export default function RootPage() {
     return () => window.removeEventListener("navigate", handler);
   }, []);
 
+  // Listen for navigateBack events dispatched by locked-feature screens that
+  // have no access to the navigate prop (e.g. PlaygroundPage, which is
+  // rendered without pageProps).
+  useEffect(() => {
+    const handler = () => {
+      setPrevPage((prev) => {
+        if (prev) {
+          setAppPage(prev);
+          return null;
+        }
+        setAppPage("dashboard");
+        return null;
+      });
+    };
+    window.addEventListener("navigateBack", handler);
+    return () => window.removeEventListener("navigateBack", handler);
+  }, []);
+
   if (!mounted) return null;
 
   // â”€â”€ Not logged in: show auth screens â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
@@ -74,10 +94,11 @@ export default function RootPage() {
             <motion.div key="login" initial={{opacity:0,y:8}} animate={{opacity:1,y:0}} exit={{opacity:0,y:-8}} transition={{duration:0.2}}>
               <LoginPage onNavigate={(p) => {
                 if (p === "dashboard") {
-                  // Redirect admin users straight to admin panel after login
-                  const loggedInUser = useStore.getState().user;
-                  setAppPage(loggedInUser?.role === "admin" ? "admin" : "dashboard");
-                } else setAuthPage(p as AuthPage);
+                  // Use the current user state or wait for it to be updated
+                  setAppPage("dashboard");
+                } else {
+                  setAuthPage(p as AuthPage);
+                }
               }} />
             </motion.div>
           )}
@@ -111,30 +132,46 @@ export default function RootPage() {
   const ml = sidebarCollapsed ? 72 : 248;
 
   const navigate = (page: string) => {
-    // guard admin route
     if (page === "admin" && user?.role !== "admin") return;
+    // Only save prev if it's a different page
+    if ((page as AppPage) !== appPage) {
+      setPrevPage(appPage);
+    }
     setAppPage(page as AppPage);
   };
 
+  const navigateBack = () => {
+    if (prevPage && prevPage !== appPage) {
+      setAppPage(prevPage);
+      setPrevPage(null);
+    } else {
+      setAppPage("dashboard");
+      setPrevPage(null);
+    }
+  };
+
   const renderPage = () => {
+    const pageProps = { onNavigate: navigate, onNavigateBack: navigateBack };
+    
     switch (appPage) {
-      case "dashboard":      return <DashboardPage onNavigate={navigate} />;
-      case "projects":       return <ProjectsPage  onNavigate={navigate} />;
-      case "project-detail": return <ProjectDetailPage onNavigate={navigate} />;
-      case "history":        return <HistoryPage   onNavigate={navigate} />;
-      case "quick-convert":  return <QuickConvertPage onNavigate={navigate} />;
-      case "generate":       return <GeneratePage onNavigate={navigate} />;
-      case "migrate":        return <MigratePage onNavigate={navigate} />;
+      case "dashboard":      return <DashboardPage {...pageProps} />;
+      case "projects":       return <ProjectsPage  {...pageProps} />;
+      case "project-detail": return <ProjectDetailPage {...pageProps} />;
+      case "history":        return <HistoryPage   {...pageProps} />;
+      case "quick-convert":  return <QuickConvertPage {...pageProps} />;
+      case "generate":       return <GeneratePage {...pageProps} />;
+      case "migrate":        return <MigratePage {...pageProps} />;
+      case "d2d":            return <D2DPage {...pageProps} />;
       case "playground":     return <PlaygroundPage />;
-      case "assistant":      return <AssistantPage onNavigate={navigate} />;
+      case "assistant":      return <AssistantPage {...pageProps} />;
       case "pricing":        return <PricingPage />;
-      case "profile":        return <ProfilePage onNavigate={navigate} />;
-      case "settings":       return <SettingsPage onNavigate={navigate} />;
+      case "profile":        return <ProfilePage {...pageProps} />;
+      case "settings":       return <SettingsPage {...pageProps} />;
       case "admin":
         if (user?.role !== "admin") return <div className="text-red-500 p-8">Access denied</div>;
         return <AdminPage />;
       default:
-        return <DashboardPage onNavigate={navigate} />;
+        return <DashboardPage {...pageProps} />;
     }
   };
 

@@ -339,3 +339,38 @@ class ProjectImage(Base):
     # Relationships
     user: Mapped["User"] = relationship("User")
     project: Mapped["Project"] = relationship("Project")
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# TABLE 13: d2d_diagrams
+# D2D (Document to Diagram) feature — stores user-generated diagrams.
+# Users convert documents, images, or text into various diagram types.
+# Visible in pgAdmin:
+#   SELECT d.id, u.full_name, d.diagram_type, d.input_type, d.status, d.created_at
+#   FROM d2d_diagrams d JOIN users u ON d.user_id = u.id
+#   ORDER BY d.created_at DESC;
+# ─────────────────────────────────────────────────────────────────────────────
+class D2DDiagram(Base):
+    __tablename__ = "d2d_diagrams"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    user_id: Mapped[int] = mapped_column(Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True)
+    diagram_uid: Mapped[str] = mapped_column(String(50), unique=True, nullable=False, index=True)
+    diagram_type: Mapped[str] = mapped_column(String(50), nullable=False, index=True)
+    # 'er' | 'class' | 'usecase' | 'flowchart' | 'dfd' | 'sequence' | 'activity' | 'architecture' | 'component' | 'schema'
+    input_type: Mapped[str] = mapped_column(String(20), nullable=False)
+    # 'image' | 'document' | 'text'
+    input_filename: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
+    input_content_preview: Mapped[Optional[str]] = mapped_column(Text, nullable=True)  # First 500 chars of extracted content
+    mermaid_syntax: Mapped[str] = mapped_column(Text, nullable=False)                   # Mermaid diagram code
+    generated_sql: Mapped[Optional[str]] = mapped_column(Text, nullable=True)           # SQL for ER/Schema diagrams
+    recommended_type: Mapped[Optional[str]] = mapped_column(String(50), nullable=True)  # Auto-detected type
+    user_selected_type: Mapped[Optional[str]] = mapped_column(String(50), nullable=True)  # Final type user chose
+    status: Mapped[str] = mapped_column(String(20), default='completed', nullable=False)  # 'processing' | 'completed' | 'failed'
+    error_message: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    processing_time_ms: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)
+    created_at: Mapped[datetime.datetime] = mapped_column(DateTime, server_default=func.now(), nullable=False, index=True)
+    updated_at: Mapped[datetime.datetime] = mapped_column(DateTime, server_default=func.now(), onupdate=func.now(), nullable=False)
+
+    # Relationship
+    user: Mapped["User"] = relationship("User")

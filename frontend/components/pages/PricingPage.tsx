@@ -3,7 +3,7 @@ import { useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import {
   Check, Zap, Crown, X, ChevronDown, ChevronUp,
-  CreditCard, Clock, Shield, Star, ArrowRight, Sparkles, Infinity as InfinityIcon
+  CreditCard, Clock, Shield, Star, ArrowRight, Sparkles, Infinity as InfinityIcon, ArrowLeft
 } from "lucide-react";
 import { useStore } from "@/lib/store";
 import { PLANS } from "@/lib/subscription";
@@ -59,7 +59,12 @@ const FAQ = [
   { q: "Is my data safe?", a: "Yes. Your ER diagrams are processed securely and are never stored on our servers. Generated code is saved locally in your browser." },
 ];
 
-export default function PricingPage() {
+interface PricingPageProps {
+  onNavigate?: (page: string) => void;
+  onNavigateBack?: () => void;
+}
+
+export default function PricingPage({ onNavigateBack }: PricingPageProps) {
   const { subscription, upgradeToPlan, user } = useStore();
   const currentPlan = subscription.planId;
   const [faqOpen, setFaqOpen] = useState<number | null>(null);

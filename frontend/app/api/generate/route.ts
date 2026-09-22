@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { buildCustomColumnsPrompt } from "@/lib/customization";
 import { CustomColumn } from "@/lib/types";
 
-const MISTRAL_MODEL   = "mistral-small-latest";
+const MISTRAL_MODEL   = "open-mistral-7b";
 const MISTRAL_API_KEY = process.env.MISTRAL_API_KEY ?? "";
 const MISTRAL_API_URL = "https://api.mistral.ai/v1/chat/completions";
 const REQUEST_TIMEOUT = 120_000;
@@ -319,57 +319,131 @@ export async function POST(req: NextRequest) {
     const timer = setTimeout(() => ctrl.abort(), REQUEST_TIMEOUT);
     const t0    = Date.now();
 
-    const res = await fetch(MISTRAL_API_URL, {
-      method: "POST",
-      headers: {
-        Authorization: `Bearer ${MISTRAL_API_KEY}`,
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        model: MISTRAL_MODEL,
-        messages: [{ role: "user", content: `${prompt}\n\nUser description: ${description}` }],
-        response_format: { type: "json_object" },
-      }),
-      signal: ctrl.signal,
-    });
+    // Retry logic for rate limits
+    let lastError = null;
+    for (let attempt = 0; attempt < 3; attempt++) {
+      try {
+        if (attempt > 0) {
+          // Wait before retry: 1s, 3s, 9s
+          const delay = Math.pow(3, attempt) * 1000;
+          console.log(`Retrying in ${delay}ms (attempt ${attempt + 1}/3)`);
+          await new Promise(resolve => setTimeout(resolve, delay));
+        }
+
+        const res = await fetch(MISTRAL_API_URL, {
+          method: "POST",
+          headers: {
+            Authorization: `Bearer ${MISTRAL_API_KEY}`,
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            model: MISTRAL_MODEL,
+            messages: [{ role: "user", content: `${prompt}\n\nUser description: ${description}` }],
+            response_format: { type: "json_object" },
+            max_tokens: 1500,  // Reduce tokens to save quota
+          }),
+          signal: ctrl.signal,
+        });
+
+        if (res.status === 429) {
+          // Rate limited - try again
+          const errorText = await res.text();
+          lastError = `Rate limit exceeded (attempt ${attempt + 1})`;
+          console.log(`Rate limited on attempt ${attempt + 1}, retrying...`);
+          continue;
+        }
+
+        clearTimeout(timer);
+
+        if (!res.ok) {
+          const txt = await res.text().catch(() => "");
+          return NextResponse.json(
+            { error: `Mistral API error ${res.status}: ${txt.slice(0, 200)}` },
+            { status: res.status }
+          );
+        }
+
+        // Success! Process the response
+        const data = await res.json();
+        const raw: string = data?.choices?.[0]?.message?.content?.trim() ?? "";
+
+        if (!raw) {
+          return NextResponse.json({ error: "Empty response from AI" }, { status: 500 });
+        }
+
+        let parsed: { mermaid: string; sql: string; tables: string[]; relationships: unknown[] };
+        try {
+          parsed = JSON.parse(raw);
+        } catch {
+          const match = raw.match(/\{[\s\S]*\}/);
+          if (!match) return NextResponse.json({ error: "AI returned invalid JSON" }, { status: 500 });
+          parsed = JSON.parse(match[0]);
+        }
+
+        if (!parsed.mermaid || !parsed.sql) {
+          return NextResponse.json({ error: "AI response missing required fields" }, { status: 500 });
+        }
+
+        return NextResponse.json({
+          mermaid: parsed.mermaid,
+          sql: parsed.sql,
+          tables: parsed.tables ?? [],
+          relationships: parsed.relationships ?? [],
+          dialect,
+          diagramType,
+          processingTime: Date.now() - t0,
+        });
+
+      } catch (fetchError: any) {
+        lastError = fetchError.message;
+        if (attempt === 2) break; // Last attempt
+        console.log(`Fetch error on attempt ${attempt + 1}:`, fetchError.message);
+      }
+    }
+
+    // All retries failed - provide local fallback
     clearTimeout(timer);
-
-    if (!res.ok) {
-      const txt = await res.text().catch(() => "");
-      return NextResponse.json(
-        { error: `Mistral API error ${res.status}: ${txt.slice(0, 200)}` },
-        { status: res.status }
-      );
+    
+    // Generate a basic fallback response
+    const fallbackMermaid = `erDiagram
+    USER {
+        int user_id PK
+        string username
+        string email
+        string created_at
     }
-
-    const data = await res.json();
-    const raw: string = data?.choices?.[0]?.message?.content?.trim() ?? "";
-
-    if (!raw) {
-      return NextResponse.json({ error: "Empty response from AI" }, { status: 500 });
+    PROFILE {
+        int profile_id PK
+        int user_id FK
+        string first_name
+        string last_name
     }
+    USER ||--|| PROFILE : "has"`;
 
-    let parsed: { mermaid: string; sql: string; tables: string[]; relationships: unknown[] };
-    try {
-      parsed = JSON.parse(raw);
-    } catch {
-      const match = raw.match(/\{[\s\S]*\}/);
-      if (!match) return NextResponse.json({ error: "AI returned invalid JSON" }, { status: 500 });
-      parsed = JSON.parse(match[0]);
-    }
+    const fallbackSQL = `-- Generated offline due to API limits
+CREATE TABLE users (
+    user_id SERIAL PRIMARY KEY,
+    username VARCHAR(255) NOT NULL,
+    email VARCHAR(255) UNIQUE,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
 
-    if (!parsed.mermaid || !parsed.sql) {
-      return NextResponse.json({ error: "AI response missing required fields" }, { status: 500 });
-    }
+CREATE TABLE profiles (
+    profile_id SERIAL PRIMARY KEY,
+    user_id INTEGER REFERENCES users(user_id),
+    first_name VARCHAR(255),
+    last_name VARCHAR(255)
+);`;
 
     return NextResponse.json({
-      mermaid: parsed.mermaid,
-      sql: parsed.sql,
-      tables: parsed.tables ?? [],
-      relationships: parsed.relationships ?? [],
+      mermaid: fallbackMermaid,
+      sql: fallbackSQL,
+      tables: ["users", "profiles"],
+      relationships: [{"from":"users","to":"profiles","type":"one-to-one","label":"has"}],
       dialect,
       diagramType,
       processingTime: Date.now() - t0,
+      warning: "Generated using fallback due to API rate limits. This is a generic template - please modify as needed."
     });
 
   } catch (err: any) {

@@ -25,8 +25,12 @@ from database import get_db
 from models import User, Image, Conversion, ApiUsage, ExportLog, UserActivity, ProjectImage, PasswordResetOTP
 from utils.activity_logger import log_activity, log_activity_bg, log_login_success_bg
 from utils.file_storage import save_uploaded_image
+from routes.d2d import router as d2d_router
 
 app = FastAPI(title="Schemalens API")
+
+# Include D2D routes
+app.include_router(d2d_router)
 
 # Mount static directory for uploads (e.g. avatars)
 os.makedirs("uploads", exist_ok=True)

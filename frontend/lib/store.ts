@@ -128,7 +128,33 @@ interface CustomizationSlice {
   resetCustomColumnsToPresets: () => void;
 }
 
-type Store = AuthSlice & UISlice & SubscriptionSlice & QuickConvertSlice & LegacyAnalysisSlice & ProjectsSlice & AdminSlice & PlaygroundSlice & CopilotSlice & CustomizationSlice;
+interface D2DSlice {
+  // Current D2D state
+  diagramUid: string | null;
+  recommendedTypes: string[];
+  selectedType: string | null;
+  mermaidCode: string | null;
+  isAnalyzing: boolean;
+  d2dIsGenerating: boolean;
+  d2dError: string | null;
+  
+  // History
+  d2dDiagrams: any[];
+  
+  // Actions
+  setDiagramUid: (uid: string | null) => void;
+  setRecommendedTypes: (types: string[]) => void;
+  setSelectedType: (type: string | null) => void;
+  setMermaidCode: (code: string | null) => void;
+  setIsAnalyzing: (analyzing: boolean) => void;
+  setIsGenerating: (generating: boolean) => void;
+  setD2DError: (error: string | null) => void;
+  addDiagram: (diagram: any) => void;
+  removeDiagram: (diagramUid: string) => void;
+  clearD2DState: () => void;
+}
+
+type Store = AuthSlice & UISlice & SubscriptionSlice & QuickConvertSlice & LegacyAnalysisSlice & ProjectsSlice & AdminSlice & PlaygroundSlice & CopilotSlice & CustomizationSlice & D2DSlice;
 
 export const useStore = create<Store>()(
   persist(
@@ -400,6 +426,41 @@ export const useStore = create<Store>()(
             id: `preset-${idx}-${Date.now()}`,
             createdAt: Date.now(),
           })),
+        }),
+
+      // ── D2D ──────────────────────────────────────────────────────────────
+      diagramUid: null,
+      recommendedTypes: [],
+      selectedType: null,
+      mermaidCode: null,
+      isAnalyzing: false,
+      d2dIsGenerating: false,
+      d2dError: null,
+      d2dDiagrams: [],
+      setDiagramUid: (uid) => set({ diagramUid: uid }),
+      setRecommendedTypes: (types) => set({ recommendedTypes: types }),
+      setSelectedType: (type) => set({ selectedType: type }),
+      setMermaidCode: (code) => set({ mermaidCode: code }),
+      setIsAnalyzing: (analyzing) => set({ isAnalyzing: analyzing }),
+      setIsGenerating: (generating) => set({ d2dIsGenerating: generating }),
+      setD2DError: (d2dError) => set({ d2dError }),
+      addDiagram: (diagram: any) =>
+        set((state) => ({
+          d2dDiagrams: [...state.d2dDiagrams, diagram].slice(0, 20),
+        })),
+      removeDiagram: (diagramUid) =>
+        set((state) => ({
+          d2dDiagrams: state.d2dDiagrams.filter((d: any) => d.diagram_uid !== diagramUid),
+        })),
+      clearD2DState: () =>
+        set({
+          diagramUid: null,
+          recommendedTypes: [],
+          selectedType: null,
+          mermaidCode: null,
+          isAnalyzing: false,
+          d2dIsGenerating: false,
+          d2dError: null,
         }),
     }),
     {

@@ -83,7 +83,18 @@ export default function LoginPage({ onNavigate }: { onNavigate: (page: string) =
             stats: e.stats as any, processingTime: e.processingTime,
             timestamp: e.timestamp, imageUrl: e.imageUrl ?? "",
           }));
-          useStore.setState({ projects: mapped, quickHistory: mappedQH, subscription: user.subscription ?? useStore.getState().subscription });
+          
+          // CRITICAL FIX: Always use subscription from user object (from database)
+          const dbSubscription = user.subscription || {
+            planId: user.plan || "free",
+            startedAt: Date.now(),
+            renewsAt: Date.now() + 30 * 24 * 60 * 60 * 1000,
+            conversionsUsedThisMonth: user.conversions_used_this_month || 0,
+            aiGenerationsUsedThisMonth: 0,
+            lastResetMonth: `${new Date().getFullYear()}-${String(new Date().getMonth() + 1).padStart(2, '0')}`,
+          };
+          
+          useStore.setState({ projects: mapped, quickHistory: mappedQH, subscription: dbSubscription });
         } catch { /* non-fatal */ }
       }
 
@@ -145,11 +156,21 @@ export default function LoginPage({ onNavigate }: { onNavigate: (page: string) =
             timestamp: e.timestamp,
             imageUrl: e.imageUrl ?? "",
           }));
+          
+          // CRITICAL FIX: Always use subscription from user object (from database)
+          const dbSubscription = user.subscription || {
+            planId: user.plan || "free",
+            startedAt: Date.now(),
+            renewsAt: Date.now() + 30 * 24 * 60 * 60 * 1000,
+            conversionsUsedThisMonth: user.conversions_used_this_month || 0,
+            aiGenerationsUsedThisMonth: 0,
+            lastResetMonth: `${new Date().getFullYear()}-${String(new Date().getMonth() + 1).padStart(2, '0')}`,
+          };
+          
           useStore.setState({
             projects: mapped,
             quickHistory: mappedQH,
-            // Restore real subscription/usage stats from DB
-            subscription: user.subscription ?? useStore.getState().subscription,
+            subscription: dbSubscription,
           });
         } catch {
           // Non-fatal — user still logs in even if history fails to load

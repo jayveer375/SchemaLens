@@ -98,7 +98,6 @@ export default function D2DPage({ onNavigate, onNavigateBack }: D2DPageProps) {
   const [isGenSql, setIsGenSql]         = useState(false);
 
   const fileRef = useRef<HTMLInputElement>(null);
-  const isPremium = subscription?.planId === "pro";
   const isDark = theme === "dark";
   const isWorking = isAnalyzing || isGenerating;
 
@@ -246,30 +245,6 @@ export default function D2DPage({ onNavigate, onNavigateBack }: D2DPageProps) {
   const hasSql = (sqlCode || mermaidCode || "").includes("CREATE TABLE");
   const diagramSQL = hasSql ? (sqlCode || mermaidCode || "") : "";
   const erType = selectedMeta?.erType || "er";
-
-  // ── premium gate ─────────────────────────────────────────────────────────
-  if (!isPremium) {
-    return (
-      <LockedFeatureScreen
-        title="Document to Diagram"
-        description="D2D converts any text, document, or image into interactive diagrams powered by AI."
-        features={[
-          { icon: "", text: "Interactive ER Diagram" },
-          { icon: "", text: "Flowchart" },
-          { icon: "", text: "DFD" },
-          { icon: "", text: "Class Diagram" },
-          { icon: "", text: "SQL DDL export" },
-          { icon: "", text: "PostgreSQL / MySQL / SQLite" },
-          { icon: "", text: "Draggable nodes" },
-          { icon: "", text: "PNG export" },
-        ]}
-        requiredPlan="pro"
-        upgradePrice="₹199 / month"
-        onNavigateBack={onNavigateBack}
-        onUpgrade={() => onNavigate?.("pricing")}
-      />
-    );
-  }
 
   return (
     <div className="w-full max-w-7xl mx-auto px-1 pb-16">

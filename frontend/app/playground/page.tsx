@@ -222,11 +222,7 @@ export default function PlaygroundPage() {
   const canUseAI = canGenerateAI(subscription);
   const creditsLeft = aiGenerationsLeft(subscription);
 
-  // Lock playground for Pro users only (Monaco editor, diagrams, etc.)
-  // Free users can use AI SQL Generator on the Generate page
-  if (!isPro) {
-    return <PlaygroundLocked />;
-  }
+  // Removed playground lock - now available to all users
   const [sql, setSql] = useState(playgroundInitialSQL || DEFAULT_SQL);
   const [result, setResult] = useState<ExecutionResult>({ status: "idle", message: "" });
   const [outputOpen, setOutputOpen] = useState(true);

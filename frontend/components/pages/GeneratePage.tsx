@@ -646,7 +646,27 @@ export default function GeneratePage({ onNavigate }: { onNavigate: (p: string) =
             Diagram Type
           </span>
         </div>
-        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-2">
+
+        {/* Mobile Dropdown (sm:hidden) */}
+        <div className="sm:hidden relative mb-2">
+          <select
+            value={diagramType}
+            onChange={(e) => setDiagramType(e.target.value as DiagramType)}
+            className="w-full appearance-none px-4 py-3 pr-10 rounded-xl text-base font-semibold border-2 border-[var(--border)] bg-[var(--card)] text-[var(--text)] focus:border-[var(--primary)] focus:outline-none transition-all shadow-sm"
+          >
+            {DIAGRAM_TYPES.map((dt) => (
+              <option key={dt.value} value={dt.value} className="bg-[var(--card)] text-[var(--text)] py-1">
+                {dt.label} — {dt.desc}
+              </option>
+            ))}
+          </select>
+          <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center px-3 text-[var(--text-muted)]">
+            <ChevronDown size={18} />
+          </div>
+        </div>
+
+        {/* Desktop / Tablet Grid (hidden sm:grid) */}
+        <div className="hidden sm:grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-2">
           {DIAGRAM_TYPES.map((dt) => {
             const Icon = dt.icon;
             const active = diagramType === dt.value;
@@ -802,7 +822,27 @@ export default function GeneratePage({ onNavigate }: { onNavigate: (p: string) =
             Target Database
           </span>
         </div>
-        <div className="flex items-center flex-wrap gap-3">
+
+        {/* Mobile Dropdown (sm:hidden) */}
+        <div className="sm:hidden relative mb-2">
+          <select
+            value={selectedDb}
+            onChange={(e) => setSelectedDb(e.target.value)}
+            className="w-full appearance-none px-4 py-3 pr-10 rounded-xl text-base font-semibold border-2 border-[var(--border)] bg-[var(--card)] text-[var(--text)] focus:border-[var(--primary)] focus:outline-none transition-all shadow-sm"
+          >
+            {DB_OPTIONS.map((db) => (
+              <option key={db.value} value={db.value} className="bg-[var(--card)] text-[var(--text)] py-1">
+                {db.label}
+              </option>
+            ))}
+          </select>
+          <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center px-3 text-[var(--text-muted)]">
+            <ChevronDown size={18} />
+          </div>
+        </div>
+
+        {/* Desktop / Tablet Buttons (hidden sm:flex) */}
+        <div className="hidden sm:flex items-center flex-wrap gap-3">
           {DB_OPTIONS.map((db) => (
             <button
               key={db.value}

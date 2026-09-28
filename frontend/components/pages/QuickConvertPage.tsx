@@ -6,7 +6,7 @@ import {
   Upload, FileCode, Clock, Copy, Download, RefreshCw,
   CheckCircle, AlertTriangle, Sparkles,
   FileText, FileJson, ArrowRight, Database,
-  Table2, GitBranch, Timer, Terminal,
+  Table2, GitBranch, Timer, Terminal, ChevronDown,
 } from "lucide-react";
 import { useStore } from "@/lib/store";
 import { parseSQLStats, downloadText, downloadJSON, genId, timeAgo, formatTime, cn } from "@/lib/utils";
@@ -212,7 +212,26 @@ export default function QuickConvertPage({ onNavigate }: { onNavigate: (p: strin
             Target Database
           </span>
         </div>
-        <div className="flex items-center flex-wrap gap-3">
+        {/* Mobile Dropdown (sm:hidden) */}
+        <div className="sm:hidden relative mb-2">
+          <select
+            value={selectedDb}
+            onChange={(e) => { setSelectedDb(e.target.value); if (qcStatus === "done") reset(); }}
+            className="w-full appearance-none px-4 py-3 pr-10 rounded-xl text-base font-semibold border-2 border-[var(--border)] bg-[var(--card)] text-[var(--text)] focus:border-[var(--primary)] focus:outline-none transition-all shadow-sm"
+          >
+            {DB_OPTIONS.map((db) => (
+              <option key={db.value} value={db.value} className="bg-[var(--card)] text-[var(--text)] py-1">
+                {db.label}
+              </option>
+            ))}
+          </select>
+          <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center px-3.5 text-[var(--text-muted)]">
+            <ChevronDown size={18} />
+          </div>
+        </div>
+
+        {/* Desktop / Tablet Buttons (hidden sm:flex) */}
+        <div className="hidden sm:flex items-center flex-wrap gap-3">
           {DB_OPTIONS.map((db) => (
             <button
               key={db.value}

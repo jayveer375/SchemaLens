@@ -1,9 +1,9 @@
-﻿"use client";
+"use client";
 import { useState, useRef } from "react";
 import {
   Sparkles, Upload, FileText, Type, Image as ImageIcon,
   Loader2, AlertCircle, Check, Copy, Download, Trash2, RefreshCw,
-  Database, LayoutGrid, ArrowLeft
+  Database, LayoutGrid, ArrowLeft, ChevronDown
 } from "lucide-react";
 import { useStore } from "@/lib/store";
 import toast from "react-hot-toast";
@@ -317,7 +317,30 @@ export default function D2DPage({ onNavigate, onNavigateBack }: D2DPageProps) {
               <p className="text-xs font-bold text-gray-500 dark:text-gray-400 uppercase tracking-wider">Diagram Type</p>
               {recommendedTypes.length > 0 && <span className="text-xs text-violet-500 font-medium">AI recommended</span>}
             </div>
-            <div className="space-y-2">
+            {/* Mobile Dropdown (sm:hidden) */}
+            <div className="sm:hidden relative mb-2">
+              <select
+                value={selectedType || "er"}
+                onChange={(e) => {
+                  setSelectedType(e.target.value);
+                  if (diagramUid) handleGenerate(e.target.value);
+                }}
+                disabled={isWorking}
+                className="w-full appearance-none px-4 py-3 pr-10 rounded-xl text-base font-semibold border-2 border-[var(--border)] bg-[var(--card)] text-[var(--text)] focus:border-[var(--primary)] focus:outline-none transition-all shadow-sm"
+              >
+                {DIAGRAM_TYPES.map(d => (
+                  <option key={d.key} value={d.key} className="bg-[var(--card)] text-[var(--text)]">
+                    {d.label} {recommendedTypes.includes(d.key) ? "(AI recommended)" : ""}
+                  </option>
+                ))}
+              </select>
+              <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center px-3.5 text-[var(--text-muted)]">
+                <ChevronDown size={18} />
+              </div>
+            </div>
+
+            {/* Desktop / Tablet List (hidden sm:block) */}
+            <div className="hidden sm:block space-y-2">
               {/* All diagram types - no locks */}
               {DIAGRAM_TYPES.map(d => (
                 <button key={d.key}
@@ -460,7 +483,21 @@ export default function D2DPage({ onNavigate, onNavigateBack }: D2DPageProps) {
                   {/* Controls */}
                   <div className="flex items-center gap-2 px-4 py-3 border-b border-gray-100 dark:border-gray-800 bg-white dark:bg-gray-900 flex-wrap">
                     <span className="text-xs font-bold text-gray-500 uppercase tracking-wider shrink-0">Dialect:</span>
-                    <div className="flex gap-1">
+                    {/* Mobile dialect select */}
+                    <div className="sm:hidden relative">
+                      <select
+                        value={sqlDialect}
+                        onChange={(e) => setSqlDialect(e.target.value)}
+                        className="appearance-none px-3 py-1.5 pr-7 text-xs font-semibold rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 text-[var(--text)] focus:outline-none"
+                      >
+                        {SQL_DIALECTS.map(d => (
+                          <option key={d.key} value={d.key}>{d.label}</option>
+                        ))}
+                      </select>
+                      <ChevronDown size={14} className="absolute right-2 top-1/2 -translate-y-1/2 pointer-events-none text-gray-400" />
+                    </div>
+                    {/* Desktop dialect buttons */}
+                    <div className="hidden sm:flex gap-1">
                       {SQL_DIALECTS.map(d => (
                         <button key={d.key} onClick={() => setSqlDialect(d.key)}
                           className={`px-2.5 py-1 rounded-lg text-xs font-semibold transition border

@@ -5,7 +5,7 @@ import {
   Lock, Sun, Globe, Trash2,
   Eye, EyeOff, AlertCircle, BarChart3,
   Sliders, Plus, Edit2, Check, Sparkles,
-  Info, CheckCircle2, RotateCcw
+  Info, CheckCircle2, RotateCcw, ChevronDown,
 } from "lucide-react";
 import { useStore } from "@/lib/store";
 import { changePassword, deleteAccount } from "@/lib/auth";
@@ -114,9 +114,32 @@ export default function SettingsPage({ onNavigate }: { onNavigate: (p: string) =
         <p className="text-base text-[var(--text-muted)] mt-1">Manage your account preferences and AI customizations</p>
       </div>
 
+      {/* Mobile Tab Select Dropdown (sm:hidden) */}
+      <div className="sm:hidden mb-4">
+        <label className="text-xs font-semibold text-[var(--text-muted)] uppercase tracking-wider block mb-1.5">
+          Settings Section
+        </label>
+        <div className="relative">
+          <select
+            value={tab}
+            onChange={(e) => setTab(e.target.value)}
+            className="w-full appearance-none px-4 py-3 pr-10 rounded-xl text-base font-semibold border-2 border-[var(--border)] bg-[var(--card)] text-[var(--text)] focus:border-[var(--primary)] focus:outline-none transition-all shadow-sm"
+          >
+            {TABS.map(({ id, label }) => (
+              <option key={id} value={id} className="bg-[var(--card)] text-[var(--text)] py-1">
+                {label}
+              </option>
+            ))}
+          </select>
+          <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center px-3.5 text-[var(--text-muted)]">
+            <ChevronDown size={18} />
+          </div>
+        </div>
+      </div>
+
       <div className="grid grid-cols-1 lg:grid-cols-[220px_1fr] gap-6">
-        {/* Sidebar tab list */}
-        <div className="card p-1.5 sm:p-2 h-fit flex lg:flex-col overflow-x-auto scroll-x gap-1">
+        {/* Sidebar tab list (hidden sm:flex, tablet horizontal, desktop vertical) */}
+        <div className="hidden sm:flex card p-1.5 sm:p-2 h-fit lg:flex-col overflow-x-auto scroll-x gap-1">
           {TABS.map(({ id, label, icon: Icon, danger }) => (
             <button
               key={id}

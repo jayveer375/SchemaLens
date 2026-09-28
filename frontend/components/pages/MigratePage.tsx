@@ -5,6 +5,7 @@ import {
   ArrowRightLeft, Database, Upload, Copy, Download,
   RefreshCw, CheckCircle, AlertTriangle, FileText,
   FileJson, ArrowRight, FileCode, Sparkles, X, Terminal,
+  ChevronDown,
 } from "lucide-react";
 import { useStore } from "@/lib/store";
 import { downloadText, downloadJSON, parseSQLStats, formatTime, cn } from "@/lib/utils";import { canConvert, conversionsLeft } from "@/lib/subscription";
@@ -133,14 +134,35 @@ function DialectPicker({
   label: string; value: string;
   onChange: (v: string) => void; exclude?: string;
 }) {
+  const options = DB_OPTIONS.filter(d => d.value !== exclude);
   return (
     <div>
       <div className="flex items-center gap-2 mb-3">
         <Database size={14} className="text-[var(--text-muted)]" />
         <span className="text-sm font-semibold text-[var(--text-muted)] uppercase tracking-widest">{label}</span>
       </div>
-      <div className="flex flex-wrap gap-2">
-        {DB_OPTIONS.filter(d => d.value !== exclude).map((db) => (
+
+      {/* Mobile Dropdown (sm:hidden) */}
+      <div className="sm:hidden relative mb-2">
+        <select
+          value={value}
+          onChange={(e) => onChange(e.target.value)}
+          className="w-full appearance-none px-4 py-3 pr-10 rounded-xl text-base font-semibold border-2 border-[var(--border)] bg-[var(--card)] text-[var(--text)] focus:border-[var(--primary)] focus:outline-none transition-all shadow-sm"
+        >
+          {options.map((db) => (
+            <option key={db.value} value={db.value} className="bg-[var(--card)] text-[var(--text)] py-1">
+              {db.label}
+            </option>
+          ))}
+        </select>
+        <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center px-3.5 text-[var(--text-muted)]">
+          <ChevronDown size={18} />
+        </div>
+      </div>
+
+      {/* Desktop / Tablet Buttons (hidden sm:flex) */}
+      <div className="hidden sm:flex flex-wrap gap-2">
+        {options.map((db) => (
           <button
             key={db.value}
             onClick={() => onChange(db.value)}
@@ -380,15 +402,17 @@ export default function MigratePage({ onNavigate }: { onNavigate: (p: string) =>
         </div>
 
         {/* Conversion badge */}
-        <div className="flex items-center gap-3 mt-5 pt-4 border-t border-[var(--border)]">
-          <span className={cn("flex items-center gap-2 px-4 py-1.5 rounded-xl text-sm font-bold border-2", srcDb.bg, srcDb.color, srcDb.border)}>
-            <Database size={13} /> {srcDb.label}
-          </span>
-          <ArrowRight size={16} className="text-[var(--text-subtle)]" />
-          <span className={cn("flex items-center gap-2 px-4 py-1.5 rounded-xl text-sm font-bold border-2", tgtDb.bg, tgtDb.color, tgtDb.border)}>
-            <Database size={13} /> {tgtDb.label}
-          </span>
-          <span className="ml-2 text-xs text-[var(--text-subtle)]">Converts: CREATE TABLE · ALTER · INSERT · UPDATE · DELETE · PROCEDURE · TRIGGER · VIEW · INDEX</span>
+        <div className="flex items-center flex-wrap gap-3 mt-5 pt-4 border-t border-[var(--border)]">
+          <div className="flex items-center gap-3">
+            <span className={cn("flex items-center gap-2 px-4 py-1.5 rounded-xl text-sm font-bold border-2", srcDb.bg, srcDb.color, srcDb.border)}>
+              <Database size={13} /> {srcDb.label}
+            </span>
+            <ArrowRight size={16} className="text-[var(--text-subtle)]" />
+            <span className={cn("flex items-center gap-2 px-4 py-1.5 rounded-xl text-sm font-bold border-2", tgtDb.bg, tgtDb.color, tgtDb.border)}>
+              <Database size={13} /> {tgtDb.label}
+            </span>
+          </div>
+          <span className="text-xs text-[var(--text-subtle)] w-full sm:w-auto sm:ml-2">Converts: CREATE TABLE · ALTER · INSERT · UPDATE · DELETE · PROCEDURE · TRIGGER · VIEW · INDEX</span>
         </div>
       </div>
 

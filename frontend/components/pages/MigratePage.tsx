@@ -301,9 +301,9 @@ export default function MigratePage({ onNavigate }: { onNavigate: (p: string) =>
     <div className="w-full px-1">
 
       {/* ── Header ── */}
-      <div className="flex items-start justify-between mb-8">
+      <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-4 mb-8">
         <div>
-          <div className="flex items-center gap-3 mb-2">
+          <div className="flex items-center gap-3 mb-2 flex-wrap">
             <ArrowRightLeft size={22} className="text-primary-600" />
             <h1 className="text-3xl font-bold text-[var(--text)]">Script Migrator</h1>
             <span className="badge badge-emerald text-xs px-2.5 py-1">AI Powered</span>

@@ -33,7 +33,7 @@ import AIAssistantPanel from "@/components/AIAssistantPanel";
 
 import { useStore } from "@/lib/store";
 import dynamic from "next/dynamic";
-import { LayoutDashboard, FolderOpen, History, Settings, Shield } from "lucide-react";
+import { LayoutDashboard, FolderOpen, History, Settings, Shield, Menu } from "lucide-react";
 
 const DatabaseScene = dynamic(() => import("@/components/ambient/DatabaseScene"), { ssr: false });
 
@@ -41,7 +41,7 @@ type AuthPage = "login" | "register" | "forgot" | "setPassword";
 type AppPage  = "dashboard" | "projects" | "project-detail" | "history" | "quick-convert" | "generate" | "migrate" | "d2d" | "playground" | "assistant" | "pricing" | "profile" | "usage" | "settings" | "admin";
 
 export default function RootPage() {
-  const { isAuthenticated, user, sidebarCollapsed } = useStore();
+  const { isAuthenticated, user, sidebarCollapsed, mobileSidebarOpen, setMobileSidebarOpen } = useStore();
   const [mounted, setMounted] = useState(false);
   const [authPage, setAuthPage] = useState<AuthPage>("login");
   const [appPage, setAppPage] = useState<AppPage>("dashboard");
@@ -53,6 +53,28 @@ export default function RootPage() {
     if (useStore.getState().isAuthenticated && useStore.getState().user?.role === "admin") {
       setAppPage("admin");
     }
+  }, []);
+
+  // Close mobile sidebar on resize to desktop (>= 1024px)
+  useEffect(() => {
+    const handleResize = () => {
+      if (window.innerWidth >= 1024 && useStore.getState().mobileSidebarOpen) {
+        useStore.getState().setMobileSidebarOpen(false);
+      }
+    };
+    window.addEventListener("resize", handleResize);
+    return () => window.removeEventListener("resize", handleResize);
+  }, []);
+
+  // Close mobile sidebar on Escape key
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === "Escape" && useStore.getState().mobileSidebarOpen) {
+        useStore.getState().setMobileSidebarOpen(false);
+      }
+    };
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
   }, []);
 
   // Listen for navigate events dispatched by gated features (e.g. PlaygroundLocked → Pricing)
@@ -177,9 +199,27 @@ export default function RootPage() {
 
   return (
     <div className="flex min-h-screen bg-[var(--surface)]">
+      {/* Backdrop overlay for mobile drawer */}
+      <AnimatePresence>
+        {mobileSidebarOpen && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            transition={{ duration: 0.2 }}
+            onClick={() => setMobileSidebarOpen(false)}
+            className="fixed inset-0 z-40 bg-black/60 backdrop-blur-xs lg:hidden"
+            aria-hidden="true"
+          />
+        )}
+      </AnimatePresence>
+
       <Sidebar page={appPage} onNavigate={navigate} />
 
-      <div className="app-main flex-1 flex flex-col min-h-screen min-w-0 max-w-full overflow-x-hidden" style={{ marginLeft: ml, transition: "margin-left 0.25s cubic-bezier(0.16,1,0.3,1)" }}>
+      <div
+        style={{ "--main-ml": `${ml}px` } as React.CSSProperties}
+        className="app-main flex-1 flex flex-col min-h-screen min-w-0 max-w-full overflow-x-hidden ml-0 lg:ml-[var(--main-ml)] transition-[margin-left] duration-[250ms] ease-[cubic-bezier(0.16,1,0.3,1)]"
+      >
         <Navbar onNavigate={navigate} page={appPage} />
 
         <main className="flex-1 pt-[57px] relative overflow-hidden flex flex-col min-w-0 w-full">
@@ -198,13 +238,7 @@ export default function RootPage() {
               </motion.div>
             </AnimatePresence>
           ) : (
-            <div
-              className="w-full py-7 transition-all duration-[250ms] ease-[cubic-bezier(0.16,1,0.3,1)]"
-              style={{
-                paddingLeft: sidebarCollapsed ? "1.5rem" : "1.25rem",
-                paddingRight: sidebarCollapsed ? "1.5rem" : "1.25rem",
-              }}
-            >
+            <div className="w-full px-3 sm:px-6 md:px-8 py-4 sm:py-7 transition-all duration-[250ms]">
               <AnimatePresence mode="wait">
                 <motion.div
                   key={appPage}
@@ -220,12 +254,47 @@ export default function RootPage() {
           )}
         </main>
       </div>
+
+      {/* Mobile Bottom Navigation */}
       <nav className="mobile-nav" aria-label="Mobile navigation">
-        {[{ id: "dashboard", label: "Home", icon: LayoutDashboard }, { id: "projects", label: "Projects", icon: FolderOpen }, { id: "history", label: "History", icon: History }, ...(user?.role === "admin" ? [{ id: "admin", label: "Admin", icon: Shield }] : []), { id: "settings", label: "Settings", icon: Settings }].map(({ id, label, icon: Icon }) => (
-          <button key={id} onClick={() => navigate(id)} className={appPage === id ? "active" : ""}>
-            <Icon size={17} /><span>{label}</span>
-          </button>
-        ))}
+        {[
+          { id: "dashboard", label: "Home", icon: LayoutDashboard },
+          { id: "projects", label: "Projects", icon: FolderOpen },
+          { id: "menu", label: "Menu", icon: Menu, isToggle: true },
+          { id: "history", label: "History", icon: History },
+          ...(user?.role === "admin"
+            ? [{ id: "admin", label: "Admin", icon: Shield }]
+            : [{ id: "settings", label: "Settings", icon: Settings }]),
+        ].map((item) => {
+          const Icon = item.icon;
+          if (item.isToggle) {
+            return (
+              <button
+                key="menu-toggle"
+                onClick={() => setMobileSidebarOpen((prev) => !prev)}
+                className={mobileSidebarOpen ? "active" : ""}
+                aria-label="Toggle navigation menu"
+                title="Toggle Menu"
+              >
+                <Icon size={18} />
+                <span>Menu</span>
+              </button>
+            );
+          }
+          return (
+            <button
+              key={item.id}
+              onClick={() => {
+                setMobileSidebarOpen(false);
+                navigate(item.id);
+              }}
+              className={appPage === item.id ? "active" : ""}
+            >
+              <Icon size={18} />
+              <span>{item.label}</span>
+            </button>
+          );
+        })}
       </nav>
 
       <AIAssistantPanel />

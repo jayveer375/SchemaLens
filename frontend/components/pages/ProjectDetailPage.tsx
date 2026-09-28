@@ -379,8 +379,8 @@ export default function ProjectDetailPage({ onNavigate }: { onNavigate: (p: stri
   return (
     <div>
       {/* Breadcrumb + ZIP export */}
-      <div className="flex items-center justify-between gap-2 mb-6">
-        <div className="flex items-center gap-2 text-sm text-[var(--text-muted)]">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-6">
+        <div className="flex items-center gap-2 text-sm text-[var(--text-muted)] flex-wrap">
           <button onClick={() => onNavigate("projects")} className="hover:text-[var(--text)] transition-colors flex items-center gap-1">
             <ArrowLeft size={14}/> Projects
           </button>

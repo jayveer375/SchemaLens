@@ -44,10 +44,12 @@ interface UISlice {
   selectedLanguage: string;
   sidebarCollapsed: boolean;
   aiAssistantOpen: boolean;
+  mobileSidebarOpen: boolean;
   setTheme: (t: "light" | "dark") => void;
   setSelectedLanguage: (l: string) => void;
   setSidebarCollapsed: (v: boolean) => void;
   setAiAssistantOpen: (open: boolean) => void;
+  setMobileSidebarOpen: (open: boolean | ((prev: boolean) => boolean)) => void;
 }
 
 interface SubscriptionSlice {
@@ -193,6 +195,7 @@ export const useStore = create<Store>()(
       selectedLanguage: "postgresql",
       sidebarCollapsed: false,
       aiAssistantOpen: false,
+      mobileSidebarOpen: false,
       setTheme: (theme) => {
         set({ theme });
         if (typeof document !== "undefined")
@@ -201,6 +204,10 @@ export const useStore = create<Store>()(
       setSelectedLanguage: (l) => set({ selectedLanguage: l }),
       setSidebarCollapsed: (v) => set({ sidebarCollapsed: v }),
       setAiAssistantOpen: (open) => set({ aiAssistantOpen: open }),
+      setMobileSidebarOpen: (open) =>
+        set((state) => ({
+          mobileSidebarOpen: typeof open === "function" ? open(state.mobileSidebarOpen) : open,
+        })),
 
       // ── Subscription ────────────────────────────────────────────────────────
       subscription: defaultSubscription(),

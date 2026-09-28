@@ -232,8 +232,8 @@ export default function AuthLayout({ children }: { children: React.ReactNode }) 
           className="w-full max-w-lg"
         >
           {/* Mobile logo */}
-          <div className="flex items-center gap-2.5 mb-10 lg:hidden">
-            <div className="w-10 h-10 rounded-xl bg-primary-600 flex items-center justify-center">
+          <div className="flex items-center gap-2.5 mb-8 lg:hidden">
+            <div className="w-10 h-10 rounded-xl flex items-center justify-center shadow-xs" style={{ background: "var(--primary)" }}>
               <Database size={20} className="text-white" />
             </div>
             <div>

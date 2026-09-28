@@ -148,14 +148,14 @@ export default function ProjectsPage({ onNavigate }: { onNavigate: (p: string) =
   return (
     <div>
       {/* Header */}
-      <div className="flex items-center justify-between mb-6">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 sm:gap-4 mb-6">
         <div>
           <h1 className="text-2xl font-bold text-[var(--text)]">Projects</h1>
           <p className="text-sm text-[var(--text-muted)] mt-0.5">
             {myProjects.length} project{myProjects.length !== 1 ? "s" : ""} total
           </p>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2 flex-wrap">
           {/* View mode toggle */}
           <div className="flex items-center rounded-xl border border-[var(--border)] bg-[var(--card)] p-0.5 overflow-hidden">
             <button

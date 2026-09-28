@@ -10,7 +10,9 @@ const queryClient = new QueryClient({
   defaultOptions: { queries: { staleTime: 1000 * 60 * 5 } },
 });
 
-const GOOGLE_CLIENT_ID = process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID ?? "";
+const GOOGLE_CLIENT_ID =
+  process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID ||
+  "367367656427-6adoe8ljuppg671a4hvt8hh1a7mqla4g.apps.googleusercontent.com";
 
 export default function Providers({ children }: { children: React.ReactNode }) {
   const { theme } = useStore();

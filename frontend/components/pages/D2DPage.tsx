@@ -1,16 +1,14 @@
 ﻿"use client";
 import { useState, useRef } from "react";
 import {
-  Sparkles, Lock, Upload, FileText, Type, Image as ImageIcon,
+  Sparkles, Upload, FileText, Type, Image as ImageIcon,
   Loader2, AlertCircle, Check, Copy, Download, Trash2, RefreshCw,
-  Database, LayoutGrid, Crown, Zap, ArrowLeft
+  Database, LayoutGrid, ArrowLeft
 } from "lucide-react";
 import { useStore } from "@/lib/store";
 import toast from "react-hot-toast";
 import { InlineDiagramViewer } from "@/components/ERDiagramModal";
 import type { DiagramType } from "@/components/ERDiagramModal";
-import LockedFeatureScreen from "@/components/LockedFeatureScreen";
-import { getAvailableD2DDiagramTypes, canUseD2DSQL } from "@/lib/feature-restrictions";
 
 interface D2DPageProps { 
   onNavigate?: (page: string) => void; 
@@ -36,30 +34,7 @@ const SQL_DIALECTS = [
 const MAX_FILE_SIZE = 5 * 1024 * 1024;
 const ALLOWED_IMG = ["image/png", "image/jpeg", "image/webp", "image/gif"];
 
-// Plan-based feature access component
-const LockedFeatureCard = ({ feature, requiredPlan, onUpgrade }: { 
-  feature: string; 
-  requiredPlan: "pro" | "ultimate";
-  onUpgrade: () => void;
-}) => (
-  <div className="relative">
-    <div className="p-3 border border-gray-300 rounded-lg bg-gray-50 opacity-60">
-      <div className="flex items-center justify-between">
-        <span className="text-sm font-medium text-gray-600">{feature}</span>
-        <Lock className="h-4 w-4 text-gray-400" />
-      </div>
-      <p className="text-xs text-gray-500 mt-1">
-        Requires {requiredPlan === "pro" ? "Pro" : "Ultimate"} plan
-      </p>
-    </div>
-    <div className="absolute inset-0 flex items-center justify-center bg-black bg-opacity-20 rounded-lg cursor-pointer" onClick={onUpgrade}>
-      <div className="bg-white px-3 py-1.5 rounded-md shadow-md flex items-center gap-2 hover:bg-gray-50">
-        <Crown className="h-4 w-4 text-orange-500" />
-        <span className="text-sm font-medium">Upgrade</span>
-      </div>
-    </div>
-  </div>
-);
+// Plan-based feature access component removed - all features free
 
 export default function D2DPage({ onNavigate, onNavigateBack }: D2DPageProps) {
   const {
@@ -67,24 +42,8 @@ export default function D2DPage({ onNavigate, onNavigateBack }: D2DPageProps) {
     isAnalyzing, d2dIsGenerating: isGenerating, d2dError: error,
     setDiagramUid, setRecommendedTypes, setSelectedType,
     setMermaidCode, setIsAnalyzing, setIsGenerating, setD2DError: setError,
-    addDiagram, clearD2DState, theme, upgradeToPlan,
+    addDiagram, clearD2DState, theme,
   } = useStore();
-
-  // Get available diagram types based on user's plan
-  const { available: availableDiagramTypes, locked: lockedDiagramTypes } = getAvailableD2DDiagramTypes(subscription);
-  
-  // Check SQL generation access
-  const sqlAccess = canUseD2DSQL(subscription);
-  
-  const handleUpgrade = (requiredPlan: "pro" | "ultimate") => {
-    if (requiredPlan === "pro") {
-      upgradeToPlan("pro");
-      toast.success("Upgraded to Pro! All features unlocked.");
-    } else {
-      upgradeToPlan("ultimate"); 
-      toast.success("Upgraded to Ultimate! All features unlocked.");
-    }
-  };
 
   const [inputMode, setInputMode]       = useState<InputMode>("text");
   const [text, setText]                 = useState("");
@@ -98,7 +57,6 @@ export default function D2DPage({ onNavigate, onNavigateBack }: D2DPageProps) {
   const [isGenSql, setIsGenSql]         = useState(false);
 
   const fileRef = useRef<HTMLInputElement>(null);
-  const isPremium = subscription?.planId === "pro";
   const isDark = theme === "dark";
   const isWorking = isAnalyzing || isGenerating;
 
@@ -247,30 +205,6 @@ export default function D2DPage({ onNavigate, onNavigateBack }: D2DPageProps) {
   const diagramSQL = hasSql ? (sqlCode || mermaidCode || "") : "";
   const erType = selectedMeta?.erType || "er";
 
-  // ── premium gate ─────────────────────────────────────────────────────────
-  if (!isPremium) {
-    return (
-      <LockedFeatureScreen
-        title="Document to Diagram"
-        description="D2D converts any text, document, or image into interactive diagrams powered by AI."
-        features={[
-          { icon: "", text: "Interactive ER Diagram" },
-          { icon: "", text: "Flowchart" },
-          { icon: "", text: "DFD" },
-          { icon: "", text: "Class Diagram" },
-          { icon: "", text: "SQL DDL export" },
-          { icon: "", text: "PostgreSQL / MySQL / SQLite" },
-          { icon: "", text: "Draggable nodes" },
-          { icon: "", text: "PNG export" },
-        ]}
-        requiredPlan="pro"
-        upgradePrice="₹199 / month"
-        onNavigateBack={onNavigateBack}
-        onUpgrade={() => onNavigate?.("pricing")}
-      />
-    );
-  }
-
   return (
     <div className="w-full max-w-7xl mx-auto px-1 pb-16">
 
@@ -384,8 +318,8 @@ export default function D2DPage({ onNavigate, onNavigateBack }: D2DPageProps) {
               {recommendedTypes.length > 0 && <span className="text-xs text-violet-500 font-medium">AI recommended</span>}
             </div>
             <div className="space-y-2">
-              {/* Available diagram types */}
-              {availableDiagramTypes.map(d => (
+              {/* All diagram types - no locks */}
+              {DIAGRAM_TYPES.map(d => (
                 <button key={d.key}
                   onClick={() => { setSelectedType(d.key); if (diagramUid) handleGenerate(d.key); }}
                   disabled={isWorking}
@@ -402,31 +336,6 @@ export default function D2DPage({ onNavigate, onNavigateBack }: D2DPageProps) {
                   )}
                   {selectedType === d.key && <Check className="w-4 h-4 text-violet-500 shrink-0" />}
                 </button>
-              ))}
-              
-              {/* Locked diagram types */}
-              {lockedDiagramTypes.map(d => (
-                <div key={d.key} className="relative">
-                  <div className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800/50 opacity-60">
-                    <div className="flex-1 text-left">
-                      <div className="font-semibold text-gray-500 dark:text-gray-400">{d.label}</div>
-                      <div className="text-xs text-gray-400 font-normal">{d.desc}</div>
-                    </div>
-                    <div className="flex items-center gap-2">
-                      <Crown className="h-4 w-4 text-orange-500" />
-                      <Lock className="h-4 w-4 text-gray-400" />
-                    </div>
-                  </div>
-                  <div 
-                    className="absolute inset-0 flex items-center justify-center bg-black bg-opacity-20 rounded-xl cursor-pointer hover:bg-opacity-30 transition"
-                    onClick={() => handleUpgrade(subscription.planId === "free" ? "pro" : "ultimate")}
-                  >
-                    <div className="bg-white dark:bg-gray-800 px-3 py-1.5 rounded-lg shadow-md flex items-center gap-2 hover:bg-gray-50 dark:hover:bg-gray-700">
-                      <Crown className="h-4 w-4 text-orange-500" />
-                      <span className="text-sm font-medium">Upgrade to {subscription.planId === "free" ? "Pro" : "Ultimate"}</span>
-                    </div>
-                  </div>
-                </div>
               ))}
             </div>
 

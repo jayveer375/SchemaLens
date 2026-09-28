@@ -50,6 +50,7 @@ export interface User {
   emailVerified: boolean;
   suspended?: boolean;
   subscription?: Subscription;
+  conversions_used_this_month?: number;
 }
 
 // ── Quick Convert (no project needed) ────────────────────────────────────────

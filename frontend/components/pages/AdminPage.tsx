@@ -444,7 +444,7 @@ function UserDetail({ user, projects, adminId, onBack, onSuspend, onPlanChange, 
   adminId: string;
   onBack: () => void;
   onSuspend: () => void;
-  onPlanChange: (p: "free" | "pro") => void;
+  onPlanChange: (p: "free" | "pro" | "ultimate") => void;
   onRoleChange: (r: "user" | "admin") => void;
   onResetConversions: () => void;
   onDelete: () => void;

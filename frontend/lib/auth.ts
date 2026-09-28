@@ -89,6 +89,7 @@ export function seedSuperAdmin() {
       name: "Super Admin",
       email: SA_EMAIL,
       role: "admin",
+      plan: "free" as const,
       createdAt: 1000000000000,
       emailVerified: true,
       suspended: false,

@@ -7,6 +7,7 @@ import {
   CheckCircle, AlertTriangle, Sparkles,
   FileText, FileJson, ArrowRight, Database,
   Table2, GitBranch, Timer, Terminal, ChevronDown,
+  Wand2, RotateCcw,
 } from "lucide-react";
 import { useStore } from "@/lib/store";
 import { parseSQLStats, downloadText, downloadJSON, genId, timeAgo, formatTime, cn } from "@/lib/utils";
@@ -66,6 +67,44 @@ export default function QuickConvertPage({ onNavigate }: { onNavigate: (p: strin
   const [limitOpen, setLimitOpen] = useState(false);
   const [selectedDb, setSelectedDb] = useState("postgresql");
 
+  const [conversionPrompt, setConversionPrompt] = useState("");
+  const [optimizingPrompt, setOptimizingPrompt] = useState(false);
+  const [previousPrompt, setPreviousPrompt]     = useState<string | null>(null);
+
+  const handleOptimizePrompt = async () => {
+    if (!conversionPrompt.trim()) {
+      toast.error("Please enter rough instructions or notes first");
+      return;
+    }
+    setOptimizingPrompt(true);
+    try {
+      const res = await fetch("/api/optimize-prompt", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ prompt: conversionPrompt, context: "quick-convert" }),
+      });
+      const data = await res.json();
+      if (!res.ok || !data.optimized) {
+        throw new Error(data.error || "Failed to optimize prompt");
+      }
+      setPreviousPrompt(conversionPrompt);
+      setConversionPrompt(data.optimized);
+      toast.success("Instructions optimized into schema directives!");
+    } catch (err: any) {
+      toast.error(err.message || "Failed to optimize prompt");
+    } finally {
+      setOptimizingPrompt(false);
+    }
+  };
+
+  const handleUndoPrompt = () => {
+    if (previousPrompt !== null) {
+      setConversionPrompt(previousPrompt);
+      setPreviousPrompt(null);
+      toast.success("Restored previous notes");
+    }
+  };
+
   const activeDb = DB_OPTIONS.find((d) => d.value === selectedDb) ?? DB_OPTIONS[0];
   const left = conversionsLeft(sub);
 
@@ -94,8 +133,12 @@ export default function QuickConvertPage({ onNavigate }: { onNavigate: (p: strin
         if (autoApplyToAllTools && activeCustomCols.length > 0) {
           form.append("customColumns", JSON.stringify(activeCustomCols));
         }
-        if (autoApplyToAllTools && globalPromptRules) {
-          form.append("customRules", globalPromptRules);
+        const combinedRules = [
+          autoApplyToAllTools && globalPromptRules ? globalPromptRules : "",
+          conversionPrompt.trim() ? `Custom Conversion Directives:\n${conversionPrompt.trim()}` : "",
+        ].filter(Boolean).join("\n\n");
+        if (combinedRules) {
+          form.append("customRules", combinedRules);
         }
         const t0  = Date.now();
         const res = await fetch("/api/analyze", { method: "POST", body: form });
@@ -139,7 +182,7 @@ export default function QuickConvertPage({ onNavigate }: { onNavigate: (p: strin
         toast.error(err.message || "Analysis failed");
       }
     },
-    [sub, qcPreview, runStepAnimation, addQuickResult, incrementConversions, selectedDb, user]
+    [sub, qcPreview, runStepAnimation, addQuickResult, incrementConversions, selectedDb, user, autoApplyToAllTools, activeCustomCols, globalPromptRules, conversionPrompt]
   );
 
   const { getRootProps, getInputProps, isDragActive } = useDropzone({
@@ -251,6 +294,70 @@ export default function QuickConvertPage({ onNavigate }: { onNavigate: (p: strin
             </button>
           ))}
         </div>
+      </div>
+
+      {/* ── Conversion Prompt / Instructions Optimizer ── */}
+      <div className="card p-4 sm:p-5 mb-7">
+        <div className="flex items-center justify-between mb-2 flex-wrap gap-2">
+          <div className="flex items-center gap-2">
+            <Wand2 size={16} className="text-primary-600" />
+            <span className="text-sm font-bold text-[var(--text)]">Conversion Instructions &amp; Prompt</span>
+            <span className="text-xs text-[var(--text-muted)] font-normal hidden sm:inline">(Optional)</span>
+          </div>
+          <div className="flex items-center gap-2">
+            {previousPrompt !== null && (
+              <button
+                type="button"
+                onClick={handleUndoPrompt}
+                className="text-xs text-[var(--text-muted)] hover:text-[var(--text)] px-2.5 py-1 rounded-lg border border-[var(--border)] transition-colors flex items-center gap-1"
+                title="Restore previous notes"
+              >
+                <RotateCcw size={12} /> Undo
+              </button>
+            )}
+            <button
+              type="button"
+              onClick={handleOptimizePrompt}
+              disabled={optimizingPrompt || !conversionPrompt.trim()}
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold
+                bg-gradient-to-r from-violet-600 via-primary-600 to-indigo-600 text-white
+                hover:shadow-md hover:shadow-primary-500/25 transition-all
+                disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer"
+              title="Optimize rough notes into formal schema directives"
+            >
+              <Sparkles size={13} className={optimizingPrompt ? "animate-spin" : ""} />
+              {optimizingPrompt ? "Optimizing…" : "Prompt Optimizer"}
+            </button>
+          </div>
+        </div>
+        <p className="text-xs text-[var(--text-muted)] mb-2.5">
+          Provide rough requirements (e.g. <em>&quot;use uuid, cascade delete, audit timestamps, snake_case&quot;</em>) and optimize them into precise schema rules applied to your converted diagram.
+        </p>
+        <textarea
+          value={conversionPrompt}
+          onChange={(e) => setConversionPrompt(e.target.value)}
+          disabled={qcStatus === "processing"}
+          placeholder="e.g. UUID primary keys, add created_at and updated_at timestamps, soft delete with is_deleted flag, and cascade deletes..."
+          rows={2}
+          className="w-full resize-none rounded-xl border border-[var(--border)] bg-[var(--surface)]
+            text-[var(--text)] placeholder:text-[var(--text-subtle)] text-sm px-3.5 py-2.5
+            focus:outline-none focus:ring-2 focus:ring-primary-500/20 focus:border-primary-500
+            transition-all disabled:opacity-50"
+        />
+        {conversionPrompt.trim() && (
+          <div className="flex items-center justify-between mt-2 text-[11px] text-[var(--text-muted)]">
+            <span className="text-primary-600 dark:text-primary-400 font-medium">
+              ✨ Prompt active: will guide SQL generation when diagram is converted
+            </span>
+            <button
+              type="button"
+              onClick={() => { setConversionPrompt(""); setPreviousPrompt(null); }}
+              className="text-red-500 hover:underline"
+            >
+              Clear
+            </button>
+          </div>
+        )}
       </div>
 
       {/* ── Main grid ── */}

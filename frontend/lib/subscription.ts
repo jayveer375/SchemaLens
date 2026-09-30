@@ -118,6 +118,10 @@ export function canUsePlayground(sub: Subscription): boolean {
   return sub.planId === "pro" || sub.planId === "ultimate";
 }
 
+export function canImportProject(sub: Subscription): boolean {
+  return sub.planId === "pro" || sub.planId === "ultimate";
+}
+
 // ── AI Generation credits helpers ───────────────────────────────────────────────
 
 /** Determines credit cost: 5 credits for small questions, 7 credits for big questions */

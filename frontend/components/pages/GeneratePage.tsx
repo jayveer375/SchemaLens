@@ -7,7 +7,7 @@ import {
   AlertTriangle, FileText, FileJson,
   Sparkles, ChevronDown, ChevronUp, Lightbulb,
   FolderOpen, Plus, X, Save, GitFork, Share2, Layers, Terminal,
-  Loader2, XCircle, Zap,
+  Loader2, XCircle, Zap, RotateCcw,
 } from "lucide-react";
 import { useStore } from "@/lib/store";
 import { parseSQLStats, downloadText, downloadJSON, genId, formatTime, cn } from "@/lib/utils";
@@ -132,6 +132,43 @@ export default function GeneratePage({ onNavigate }: { onNavigate: (p: string) =
   const activeCustomCols = (customColumns || []).filter((c) => c.enabled);
 
   const [description, setDescription]   = useState("");
+  const [optimizingPrompt, setOptimizingPrompt] = useState(false);
+  const [previousPrompt, setPreviousPrompt]     = useState<string | null>(null);
+
+  const handleOptimizePrompt = async () => {
+    if (!description.trim()) {
+      toast.error("Please enter a rough schema description first");
+      return;
+    }
+    setOptimizingPrompt(true);
+    try {
+      const res = await fetch("/api/optimize-prompt", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ prompt: description, context: "generate" }),
+      });
+      const data = await res.json();
+      if (!res.ok || !data.optimized) {
+        throw new Error(data.error || "Failed to optimize prompt");
+      }
+      setPreviousPrompt(description);
+      setDescription(data.optimized);
+      toast.success("Prompt optimized into structured specification!");
+    } catch (err: any) {
+      toast.error(err.message || "Failed to optimize prompt");
+    } finally {
+      setOptimizingPrompt(false);
+    }
+  };
+
+  const handleUndoPrompt = () => {
+    if (previousPrompt !== null) {
+      setDescription(previousPrompt);
+      setPreviousPrompt(null);
+      toast.success("Restored previous prompt");
+    }
+  };
+
   const [selectedDb, setSelectedDb]     = useState("postgresql");
   const [diagramType, setDiagramType]   = useState("er");
   const [status, setStatus]             = useState<"idle" | "processing" | "done" | "error">("idle");
@@ -631,7 +668,27 @@ export default function GeneratePage({ onNavigate }: { onNavigate: (p: string) =
             Diagram Type
           </span>
         </div>
-        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-2">
+
+        {/* Mobile Dropdown (sm:hidden) */}
+        <div className="sm:hidden relative mb-2">
+          <select
+            value={diagramType}
+            onChange={(e) => setDiagramType(e.target.value as DiagramType)}
+            className="w-full appearance-none px-4 py-3 pr-10 rounded-xl text-base font-semibold border-2 border-[var(--border)] bg-[var(--card)] text-[var(--text)] focus:border-[var(--primary)] focus:outline-none transition-all shadow-sm"
+          >
+            {DIAGRAM_TYPES.map((dt) => (
+              <option key={dt.value} value={dt.value} className="bg-[var(--card)] text-[var(--text)] py-1">
+                {dt.label} — {dt.desc}
+              </option>
+            ))}
+          </select>
+          <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center px-3 text-[var(--text-muted)]">
+            <ChevronDown size={18} />
+          </div>
+        </div>
+
+        {/* Desktop / Tablet Grid (hidden sm:grid) */}
+        <div className="hidden sm:grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-2">
           {DIAGRAM_TYPES.map((dt) => {
             const Icon = dt.icon;
             const active = diagramType === dt.value;
@@ -787,7 +844,27 @@ export default function GeneratePage({ onNavigate }: { onNavigate: (p: string) =
             Target Database
           </span>
         </div>
-        <div className="flex items-center flex-wrap gap-3">
+
+        {/* Mobile Dropdown (sm:hidden) */}
+        <div className="sm:hidden relative mb-2">
+          <select
+            value={selectedDb}
+            onChange={(e) => setSelectedDb(e.target.value)}
+            className="w-full appearance-none px-4 py-3 pr-10 rounded-xl text-base font-semibold border-2 border-[var(--border)] bg-[var(--card)] text-[var(--text)] focus:border-[var(--primary)] focus:outline-none transition-all shadow-sm"
+          >
+            {DB_OPTIONS.map((db) => (
+              <option key={db.value} value={db.value} className="bg-[var(--card)] text-[var(--text)] py-1">
+                {db.label}
+              </option>
+            ))}
+          </select>
+          <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center px-3 text-[var(--text-muted)]">
+            <ChevronDown size={18} />
+          </div>
+        </div>
+
+        {/* Desktop / Tablet Buttons (hidden sm:flex) */}
+        <div className="hidden sm:flex items-center flex-wrap gap-3">
           {DB_OPTIONS.map((db) => (
             <button
               key={db.value}
@@ -811,16 +888,41 @@ export default function GeneratePage({ onNavigate }: { onNavigate: (p: string) =
 
       {/* ── Input Area ── */}
       <div className="card p-5 mb-6">
-        <div className="flex items-center justify-between mb-3">
+        <div className="flex items-center justify-between mb-3 flex-wrap gap-2">
           <label className="text-base font-bold text-[var(--text)]">Describe your database</label>
-          <button
-            onClick={() => setShowExamples(!showExamples)}
-            className="flex items-center gap-1.5 text-sm text-[var(--text-muted)] font-medium hover:text-[var(--text)] transition-colors"
-          >
-            <Lightbulb size={15} />
-            Examples
-            {showExamples ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
-          </button>
+          <div className="flex items-center gap-2">
+            {previousPrompt !== null && (
+              <button
+                type="button"
+                onClick={handleUndoPrompt}
+                className="text-xs text-[var(--text-muted)] hover:text-[var(--text)] px-2.5 py-1.5 rounded-lg border border-[var(--border)] transition-colors flex items-center gap-1 cursor-pointer"
+                title="Revert to original prompt"
+              >
+                <RotateCcw size={12} /> Undo
+              </button>
+            )}
+            <button
+              type="button"
+              onClick={handleOptimizePrompt}
+              disabled={optimizingPrompt || !description.trim()}
+              className="flex items-center gap-1.5 px-3.5 py-1.5 rounded-lg text-xs font-semibold
+                bg-gradient-to-r from-violet-600 via-primary-600 to-indigo-600 text-white
+                hover:shadow-md hover:shadow-primary-500/25 transition-all
+                disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer"
+              title="Transform your rough notes into a detailed, production-ready schema prompt"
+            >
+              <Wand2 size={13} className={optimizingPrompt ? "animate-spin" : ""} />
+              {optimizingPrompt ? "Optimizing…" : "Prompt Optimizer"}
+            </button>
+            <button
+              onClick={() => setShowExamples(!showExamples)}
+              className="flex items-center gap-1.5 text-sm text-[var(--text-muted)] font-medium hover:text-[var(--text)] transition-colors ml-1"
+            >
+              <Lightbulb size={15} />
+              Examples
+              {showExamples ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
+            </button>
+          </div>
         </div>
 
         <AnimatePresence>

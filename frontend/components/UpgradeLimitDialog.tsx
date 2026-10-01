@@ -7,7 +7,7 @@ import { PLANS } from "@/lib/subscription";
 interface UpgradeLimitDialogProps {
   open: boolean;
   onClose: () => void;
-  reason: "conversions" | "projects" | "images";
+  reason: "conversions" | "projects" | "images" | "import";
   onNavigatePricing?: () => void;
 }
 
@@ -27,6 +27,11 @@ const REASONS = {
     desc: "Free plan allows up to 5 images per project.",
     detail: "Upgrade to Pro to upload up to 25 images per project.",
   },
+  import: {
+    title: "Pro & Ultimate Exclusive",
+    desc: "Import Project is only available for Pro and Ultimate subscribers.",
+    detail: "Upgrade to Pro or Ultimate to import ZIP archives, project backups, SQL schemas, and share workflows.",
+  },
 };
 
 const PRO = PLANS.pro;
@@ -34,10 +39,10 @@ const PRO_FEATURES = [
   `${PRO.conversionsPerMonth} conversions / month`,
   `${PRO.maxProjects} projects`,
   `${PRO.maxImagesPerProject} images per project`,
+  "Import & Export Projects (.zip / .json / .sql)",
   "ZIP project export",
   "Version history",
   "Advanced export (SQL · TXT · JSON)",
-  "Priority queue processing",
   "Priority support",
 ];
 

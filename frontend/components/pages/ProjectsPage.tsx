@@ -3,14 +3,16 @@ import { useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import {
   Plus, Search, FolderOpen, MoreVertical, Trash2, Edit2, Copy,
-  Database, Pin, X, CheckSquare, Square, AlertTriangle, List, Globe2
+  Database, Pin, X, CheckSquare, Square, AlertTriangle, List, Globe2,
+  Upload, Download,
 } from "lucide-react";
 import { useStore } from "@/lib/store";
-import { genId, timeAgo } from "@/lib/utils";
-import { canCreateProject } from "@/lib/subscription";
+import { genId, timeAgo, downloadJSON } from "@/lib/utils";
+import { canCreateProject, canImportProject } from "@/lib/subscription";
 import { cn } from "@/lib/utils";
 import type { Project, DBType } from "@/lib/types";
 import UpgradeLimitDialog from "@/components/UpgradeLimitDialog";
+import ImportProjectModal from "@/components/ImportProjectModal";
 import GalaxyView from "@/components/GalaxyView";
 import toast from "react-hot-toast";
 import { apiSaveProject, apiDeleteProject } from "@/lib/api";
@@ -31,7 +33,9 @@ export default function ProjectsPage({ onNavigate }: { onNavigate: (p: string) =
 
   const [search,    setSearch]    = useState("");
   const [showCreate, setShowCreate] = useState(false);
+  const [showImport, setShowImport] = useState(false);
   const [limitOpen, setLimitOpen] = useState(false);
+  const [limitReason, setLimitReason] = useState<"projects" | "import">("projects");
   const [menuOpen,  setMenuOpen]  = useState<string | null>(null);
   const [renaming,  setRenaming]  = useState<string | null>(null);
   const [renameVal, setRenameVal] = useState("");
@@ -134,6 +138,36 @@ export default function ProjectsPage({ onNavigate }: { onNavigate: (p: string) =
     }
     setRenaming(null);
   };
+  const sub = getSubscription();
+  const isProOrUltimate = canImportProject(sub);
+
+  const handleImportClick = () => {
+    if (!isProOrUltimate) {
+      setLimitReason("import");
+      setLimitOpen(true);
+      return;
+    }
+    if (!canCreateProject(sub, myProjects.length)) {
+      setLimitReason("projects");
+      setLimitOpen(true);
+      return;
+    }
+    setShowImport(true);
+  };
+
+  const handleImportSuccess = async (importedProject: Project) => {
+    upsertProject(importedProject);
+    await syncProject(importedProject);
+    setActiveProject(importedProject.id);
+    toast.success(`Project "${importedProject.name}" imported successfully!`);
+    onNavigate("project-detail");
+  };
+
+  const exportProject = (p: Project) => {
+    downloadJSON(p, `${p.name.toLowerCase().replace(/[^a-z0-9_-]/g, "_")}_project.json`);
+    toast.success("Project exported as JSON");
+  };
+
   const togglePin = async (p: Project) => {
     const updated = { ...p, pinned: !p.pinned, updatedAt: Date.now() };
     upsertProject(updated);
@@ -206,6 +240,21 @@ export default function ProjectsPage({ onNavigate }: { onNavigate: (p: string) =
               <X size={14} /> Cancel
             </button>
           )}
+          {/* Import Project Button (Pro & Ultimate Feature) */}
+          <motion.button
+            whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.97 }}
+            onClick={handleImportClick}
+            className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-sm font-semibold
+              border border-violet-500/30 text-violet-600 dark:text-violet-400 bg-violet-500/10
+              hover:bg-violet-500/20 hover:border-violet-500/50 transition-all cursor-pointer"
+            title="Import Project from ZIP, SQL, or JSON (Pro & Ultimate Feature)"
+          >
+            <Upload size={14} /> Import Project
+            <span className="text-[10px] uppercase font-bold tracking-wider px-1.5 py-0.5 rounded-full bg-violet-500/20 text-violet-600 dark:text-violet-300">
+              Pro
+            </span>
+          </motion.button>
+
           <motion.button
             whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.97 }}
             onClick={() => setShowCreate(true)}
@@ -272,9 +321,21 @@ export default function ProjectsPage({ onNavigate }: { onNavigate: (p: string) =
             </p>
           </div>
           {!search && (
-            <button onClick={() => setShowCreate(true)} className="btn-primary text-sm">
-              <Plus size={14} /> Create Project
-            </button>
+            <div className="flex items-center gap-3 flex-wrap justify-center">
+              <button onClick={() => setShowCreate(true)} className="btn-primary text-sm">
+                <Plus size={14} /> Create Project
+              </button>
+              <button
+                onClick={handleImportClick}
+                title="Import Project from ZIP, SQL, or JSON (Pro & Ultimate Feature)"
+                className="flex items-center gap-1.5 px-4 py-2 rounded-xl text-sm font-semibold border border-violet-500/30 text-violet-600 dark:text-violet-400 bg-violet-500/10 hover:bg-violet-500/20 transition-all cursor-pointer"
+              >
+                <Upload size={14} /> Import Project
+                <span className="text-[10px] uppercase font-bold tracking-wider px-1.5 py-0.5 rounded-full bg-violet-500/20 text-violet-600 dark:text-violet-300">
+                  Pro
+                </span>
+              </button>
+            </div>
           )}
         </div>
       )}
@@ -324,9 +385,10 @@ export default function ProjectsPage({ onNavigate }: { onNavigate: (p: string) =
                     {menuOpen === p.id && (
                       <div className="absolute right-0 top-full mt-1 z-20 card shadow-card-lg py-1.5 w-44 rounded-xl">
                         {[
-                          { icon: Edit2,  label: "Rename",                  action: () => startRename(p) },
-                          { icon: Copy,   label: "Duplicate",               action: () => { duplicate(p); setMenuOpen(null); } },
-                          { icon: Pin,    label: p.pinned ? "Unpin" : "Pin", action: () => { togglePin(p); setMenuOpen(null); } },
+                          { icon: Edit2,    label: "Rename",                  action: () => startRename(p) },
+                          { icon: Copy,     label: "Duplicate",               action: () => { duplicate(p); setMenuOpen(null); } },
+                          { icon: Download, label: "Export Project",          action: () => { exportProject(p); setMenuOpen(null); } },
+                          { icon: Pin,      label: p.pinned ? "Unpin" : "Pin", action: () => { togglePin(p); setMenuOpen(null); } },
                           { icon: Trash2, label: "Delete", action: () => {
                             const numericId = parseInt(user?.id ?? "", 10);
                             deleteProject(p.id, ownerId);
@@ -525,10 +587,17 @@ export default function ProjectsPage({ onNavigate }: { onNavigate: (p: string) =
         )}
       </AnimatePresence>
 
+      <ImportProjectModal
+        open={showImport}
+        onClose={() => setShowImport(false)}
+        onImport={handleImportSuccess}
+        ownerId={ownerId}
+      />
+
       <UpgradeLimitDialog
         open={limitOpen}
         onClose={() => setLimitOpen(false)}
-        reason="projects"
+        reason={limitReason}
         onNavigatePricing={() => onNavigate("pricing")}
       />
     </div>

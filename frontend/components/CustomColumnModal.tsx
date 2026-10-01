@@ -109,7 +109,7 @@ export default function CustomColumnModal({
           animate={{ opacity: 1, scale: 1, y: 0 }}
           exit={{ opacity: 0, scale: 0.95, y: 10 }}
           transition={{ duration: 0.2, ease: "easeOut" }}
-          className="relative w-full max-w-lg rounded-2xl bg-[var(--card)] border border-[var(--border)] shadow-2xl overflow-hidden my-8"
+          className="relative w-full max-w-4xl rounded-2xl bg-[var(--card)] border border-[var(--border)] shadow-2xl overflow-hidden my-8"
           onClick={(e) => e.stopPropagation()}
         >
           {/* Modal Header */}

@@ -162,7 +162,7 @@ export default function LoginPage({ onNavigate }: { onNavigate: (page: string) =
             planId: user.plan || "free",
             startedAt: Date.now(),
             renewsAt: Date.now() + 30 * 24 * 60 * 60 * 1000,
-            conversionsUsedThisMonth: user.conversions_used_this_month || 0,
+            conversionsUsedThisMonth: (user as any).subscription?.conversionsUsedThisMonth ?? (user as any).conversions_used_this_month ?? 0,
             aiGenerationsUsedThisMonth: 0,
             lastResetMonth: `${new Date().getFullYear()}-${String(new Date().getMonth() + 1).padStart(2, '0')}`,
           };

@@ -75,13 +75,12 @@ function NavBtn({
 
 // ─────────────────────────────────────────────────────────────────────────────
 export default function Sidebar({ page, onNavigate }: SidebarProps) {
-  const { user, sidebarCollapsed, setSidebarCollapsed, projects: allProjects, theme, getSubscription } = useStore();
+  const { user, sidebarCollapsed, setSidebarCollapsed, mobileSidebarOpen, setMobileSidebarOpen, projects: allProjects, theme, getSubscription } = useStore();
   const activeNav = `${activeNavBase} ${activeTextColor(theme)}`;
   const subscription = getSubscription();
   const isPro = canUsePlayground(subscription);
   const aiCreditsLeft = aiGenerationsLeft(subscription);
 
-  const [mobileOpen, setMobileOpen] = useState(true);
   const [toolsOpen, setToolsOpen] = useState(
     ["quick-convert", "generate", "migrate", "d2d", "playground", "assistant"].includes(page)
   );
@@ -93,7 +92,7 @@ export default function Sidebar({ page, onNavigate }: SidebarProps) {
 
   const handleNavigate = (id: string) => {
     onNavigate(id);
-    setMobileOpen(false);
+    setMobileSidebarOpen(false);
   };
 
   return (
@@ -101,43 +100,36 @@ export default function Sidebar({ page, onNavigate }: SidebarProps) {
       animate={{ width }}
       transition={{ duration: 0.25, ease: [0.16, 1, 0.3, 1] }}
       className={cn(
-        "sidebar fixed left-0 top-0 bottom-0 z-30 flex flex-col overflow-hidden",
+        "sidebar fixed left-0 top-0 bottom-0 z-50 lg:z-30 flex flex-col overflow-hidden",
         "bg-[var(--surface-sidebar)] border-r border-[var(--border)]",
-        mobileOpen && "mobile-sidebar-open"
+        mobileSidebarOpen && "mobile-sidebar-open"
       )}
     >
       {/* ── Logo ──────────────────────────────────────────────────────────── */}
       <div className="flex items-center h-[60px] px-[14px] border-b border-[var(--border)] flex-shrink-0 gap-3">
         <div
-          className="w-9 h-9 rounded-lg flex items-center justify-center flex-shrink-0"
+          className="w-9 h-9 rounded-lg flex items-center justify-center flex-shrink-0 shadow-xs cursor-pointer"
           style={{ background: "var(--primary)" }}
+          onClick={() => handleNavigate("dashboard")}
         >
           <Database size={17} className="text-white" />
         </div>
 
-        <AnimatePresence>
-          {!sidebarCollapsed && (
-            <motion.div
-              initial={{ opacity: 0, x: -8 }}
-              animate={{ opacity: 1, x: 0 }}
-              exit={{ opacity: 0, x: -8 }}
-              transition={{ duration: 0.2 }}
-              className="min-w-0"
-            >
-              <p className="font-bold text-[16px] text-[var(--text)] whitespace-nowrap leading-tight">
-                Schemalens
-              </p>
-              <p className="text-[13px] text-[var(--text-subtle)] whitespace-nowrap leading-tight mt-0.5">
-                AI Schema Toolkit
-              </p>
-            </motion.div>
-          )}
-        </AnimatePresence>
+        <div className={cn("min-w-0 flex-1 cursor-pointer", sidebarCollapsed && "lg:hidden")} onClick={() => handleNavigate("dashboard")}>
+          <p className="font-bold text-[16px] text-[var(--text)] whitespace-nowrap leading-tight">
+            Schemalens
+          </p>
+          <p className="text-[13px] text-[var(--text-subtle)] whitespace-nowrap leading-tight mt-0.5">
+            AI Schema Toolkit
+          </p>
+        </div>
 
+        {/* Mobile close button */}
         <button
-          onClick={() => setMobileOpen(false)}
-          className="mobile-sidebar-close"
+          onClick={() => setMobileSidebarOpen(false)}
+          className="lg:hidden ml-auto w-8 h-8 rounded-lg flex items-center justify-center text-[var(--text-muted)] hover:bg-[var(--surface)] hover:text-[var(--text)] transition-colors"
           aria-label="Close navigation"
+          title="Close Navigation"
         >
           <X size={18} />
         </button>
@@ -379,25 +371,19 @@ export default function Sidebar({ page, onNavigate }: SidebarProps) {
           {!sidebarCollapsed && <span>Sign Out</span>}
         </button>
 
-        {/* Collapse toggle */}
+        {/* Collapse toggle (desktop only) */}
         <button
           onClick={() => setSidebarCollapsed(!sidebarCollapsed)}
           className={cn(
-            "w-full flex items-center justify-center py-[11px] rounded-[12px] transition-all duration-200",
+            "w-full hidden lg:flex items-center justify-center py-[11px] rounded-[12px] transition-all duration-200",
             bottomHover,
           )}
+          title={sidebarCollapsed ? "Expand sidebar" : "Collapse sidebar"}
+          aria-label={sidebarCollapsed ? "Expand sidebar" : "Collapse sidebar"}
         >
           {sidebarCollapsed ? <ChevronRight size={17} /> : <ChevronLeft size={17} />}
         </button>
       </div>
-
-      <button
-        onClick={() => setMobileOpen((open) => !open)}
-        className="mobile-sidebar-toggle"
-        aria-label={mobileOpen ? "Close navigation" : "Open navigation"}
-      >
-        {mobileOpen ? <X size={20} /> : <Database size={20} />}
-      </button>
     </motion.aside>
   );
 }

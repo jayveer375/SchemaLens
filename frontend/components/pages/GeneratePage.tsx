@@ -4,7 +4,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import {
   Wand2, Database, Table2, GitBranch, Timer,
   Copy, Download, RefreshCw, CheckCircle,
-  AlertTriangle, ArrowRight, FileText, FileJson,
+  AlertTriangle, FileText, FileJson,
   Sparkles, ChevronDown, ChevronUp, Lightbulb,
   FolderOpen, Plus, X, Save, GitFork, Share2, Layers, Terminal,
   Loader2, XCircle, Zap,
@@ -16,7 +16,6 @@ import { canConvert, conversionsLeft, canCreateProject, canGenerateAI, aiGenerat
 import type { Project, DBType } from "@/lib/types";
 import UpgradeLimitDialog from "@/components/UpgradeLimitDialog";
 import { InlineDiagramViewer, type DiagramType } from "@/components/ERDiagramModal";
-import AICreditsWidget from "@/components/AICreditsWidget";
 import dynamic from "next/dynamic";
 import toast from "react-hot-toast";
 
@@ -593,10 +592,6 @@ export default function GeneratePage({ onNavigate }: { onNavigate: (p: string) =
         </div>
 
         <div className="flex items-center gap-3 flex-wrap">
-          <div className="w-full sm:w-60 flex-shrink-0">
-            <AICreditsWidget onNavigate={onNavigate} />
-          </div>
-
           <button
             onClick={() => setAiPanelOpen(!aiPanelOpen)}
             className={cn(
@@ -607,16 +602,6 @@ export default function GeneratePage({ onNavigate }: { onNavigate: (p: string) =
             <Sparkles size={14} />
             <span>AI SQL</span>
           </button>
-          {sub.planId !== "pro" && (
-            <button
-              onClick={() => onNavigate("pricing")}
-              className="flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-semibold shrink-0
-                bg-gradient-to-r from-primary-600 to-primary-700 text-white
-                hover:shadow-lg hover:shadow-primary-500/25 transition-all"
-            >
-              Upgrade to Pro <ArrowRight size={14} />
-            </button>
-          )}
         </div>
       </div>
 

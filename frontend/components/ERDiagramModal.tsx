@@ -500,7 +500,7 @@ export default function ERDiagramModal({ sql, isOpen, onClose, theme, initialTab
             animate={{ opacity: 1, scale: 1,    y: 0  }}
             exit={{    opacity: 0, scale: 0.97, y: 16 }}
             transition={{ type: "spring", stiffness: 350, damping: 30 }}
-            className={cn("fixed inset-4 sm:inset-6 md:inset-8 z-50 rounded-2xl overflow-hidden flex flex-col shadow-2xl", theme === "dark" ? "bg-[#1C1718]" : "bg-white")}
+            className={cn("fixed inset-2 sm:inset-6 md:inset-8 z-50 rounded-2xl overflow-hidden flex flex-col shadow-2xl", theme === "dark" ? "bg-[#1C1718]" : "bg-white")}
             onClick={(e) => e.stopPropagation()}
           >
             <ModalShell sql={sql} theme={theme} onClose={onClose} initialTab={initialTab} />

@@ -149,14 +149,14 @@ export default function DashboardPage({ onNavigate }: { onNavigate: (p: string) 
       {/* ── HERO ─────────────────────────────────────────────────────────── */}
       <motion.div {...fadeUp(0)} className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
         <div>
-          <h1 className="text-3xl sm:text-4xl font-bold text-[var(--text)]">
+          <h1 className="text-2xl sm:text-3xl lg:text-4xl font-bold text-[var(--text)]">
             Welcome back, {user?.name?.split(" ")[0] ?? "there"} 👋
           </h1>
-          <p className="mt-1.5 text-base text-[var(--text-muted)]">
+          <p className="mt-1 text-sm sm:text-base text-[var(--text-muted)]">
             Here's what's happening with your databases today.
           </p>
         </div>
-        <div className="flex items-center gap-2 flex-shrink-0">
+        <div className="flex flex-wrap items-center gap-2 flex-shrink-0">
           {!isPro && (
             <button onClick={() => onNavigate("pricing")}
               className="btn-primary text-sm hover:!bg-[var(--primary)] hover:!transform-none">
@@ -171,7 +171,7 @@ export default function DashboardPage({ onNavigate }: { onNavigate: (p: string) 
       </motion.div>
 
       {/* ── KPI CARDS ────────────────────────────────────────────────────── */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
         <KpiCard delay={0.06} label="Total Projects"    value={myProjects.length}            sub={`${plan.maxProjects} max on ${plan.name}`}          icon={FolderOpen}    color="text-white" bg="bg-[var(--primary)]"                         />
         <KpiCard delay={0.09} label="SQL Generated"     value={totalDone}                    sub={totalFiles > 0 ? `${successRate}% success rate` : "No files yet"} icon={Database}   color="text-white" bg="bg-emerald-500"                        />
         <KpiCard delay={0.12} label="AI Requests Used"  value={sub.conversionsUsedThisMonth} sub={`${left} remaining this month`}                     icon={BarChart3}     color="text-white" bg="bg-violet-500"                                  />

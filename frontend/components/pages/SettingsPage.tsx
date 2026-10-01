@@ -116,13 +116,13 @@ export default function SettingsPage({ onNavigate }: { onNavigate: (p: string) =
 
       <div className="grid grid-cols-1 lg:grid-cols-[220px_1fr] gap-6">
         {/* Sidebar tab list */}
-        <div className="card p-2 h-fit">
+        <div className="card p-1.5 sm:p-2 h-fit flex lg:flex-col overflow-x-auto scroll-x gap-1">
           {TABS.map(({ id, label, icon: Icon, danger }) => (
             <button
               key={id}
               onClick={() => setTab(id)}
               className={cn(
-                "w-full flex items-center gap-3 px-3.5 py-3 rounded-xl text-base font-medium transition-all",
+                "flex items-center gap-2 sm:gap-3 px-3 sm:px-3.5 py-2 sm:py-3 rounded-xl text-sm sm:text-base font-medium transition-all whitespace-nowrap flex-shrink-0 lg:w-full",
                 tab === id
                   ? danger
                     ? "bg-red-50 dark:bg-red-500/10 text-red-600"
@@ -133,7 +133,7 @@ export default function SettingsPage({ onNavigate }: { onNavigate: (p: string) =
               )}
               style={tab === id && !danger ? { background: "var(--primary)" } : undefined}
             >
-              <Icon size={17} />{label}
+              <Icon size={17} className="flex-shrink-0" />{label}
             </button>
           ))}
         </div>

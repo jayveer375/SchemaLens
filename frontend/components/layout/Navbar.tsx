@@ -1,7 +1,7 @@
 "use client";
 import { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { Sun, Moon, Search, CheckCircle2, User, Settings, LogOut, ArrowRight, Sparkles } from "lucide-react";
+import { Sun, Moon, Search, CheckCircle2, User, Settings, LogOut, ArrowRight, Sparkles, Menu, X, Database } from "lucide-react";
 import { useStore } from "@/lib/store";
 import { initials, cn } from "@/lib/utils";
 import { getPlan } from "@/lib/subscription";
@@ -11,7 +11,7 @@ interface NavbarProps { onNavigate: (p: string) => void; page?: string; }
 
 export default function Navbar({ onNavigate, page }: NavbarProps) {
   const isAdminPage = page === "admin";
-  const { theme, setTheme, user, sidebarCollapsed, getSubscription, projects: allProjects } = useStore();
+  const { theme, setTheme, user, sidebarCollapsed, mobileSidebarOpen, setMobileSidebarOpen, getSubscription, projects: allProjects } = useStore();
   const sub  = getSubscription();
   const plan = getPlan(sub);
   const ml   = sidebarCollapsed ? 72 : 248;
@@ -36,30 +36,76 @@ export default function Navbar({ onNavigate, page }: NavbarProps) {
   return (
     <>
       <header
-        style={{ left: ml }}
-        className="app-navbar fixed top-0 right-0 z-20 h-[57px] flex items-center justify-between
-          px-6 bg-[var(--card)] border-b border-[var(--border)] transition-[left] duration-[250ms]"
+        style={{ "--navbar-left": `${ml}px` } as React.CSSProperties}
+        className="app-navbar fixed top-0 right-0 z-30 h-[57px] flex items-center justify-between
+          px-3 sm:px-6 bg-[var(--card)] border-b border-[var(--border)] transition-[left] duration-[250ms]
+          left-0 lg:left-[var(--navbar-left)]"
       >
-        {/* Search trigger — hidden on admin page */}
-        {!isAdminPage && (
-        <button
-          onClick={() => setSearchOpen(true)}
-          className="relative hidden sm:flex items-center gap-2 pl-3 pr-3 py-2 text-sm rounded-xl
-            border border-[var(--border)] bg-[var(--surface)] text-[var(--text-subtle)]
-            hover:border-[var(--primary)]/50 hover:text-[var(--text)] transition-all w-96 text-left"
-        >
-          <Search size={14} className="flex-shrink-0" />
-          <span className="flex-1 text-sm">Search projects, SQL...</span>
-          <span className="flex items-center gap-0.5 flex-shrink-0">
-            <kbd className="inline-flex items-center justify-center px-1.5 h-5 rounded border
-              border-[var(--border)] bg-[var(--card)] text-[10px] font-mono text-[var(--text-subtle)]">Ctrl</kbd>
-            <kbd className="inline-flex items-center justify-center px-1.5 h-5 rounded border
-              border-[var(--border)] bg-[var(--card)] text-[10px] font-mono text-[var(--text-subtle)]">K</kbd>
-          </span>
-        </button>
-        )}
+        <div className="flex items-center gap-2 sm:gap-3 min-w-0">
+          {/* Mobile Menu Toggle Button */}
+          <motion.button
+            whileTap={{ scale: 0.92 }}
+            onClick={() => setMobileSidebarOpen((prev) => !prev)}
+            className="lg:hidden w-9 h-9 rounded-xl flex items-center justify-center
+              border border-[var(--border)] bg-[var(--surface)] text-[var(--text)]
+              hover:border-[var(--primary)]/50 hover:text-[var(--primary)] transition-all flex-shrink-0"
+            aria-label={mobileSidebarOpen ? "Close navigation menu" : "Open navigation menu"}
+            title="Toggle Menu"
+          >
+            {mobileSidebarOpen ? <X size={19} /> : <Menu size={19} />}
+          </motion.button>
 
-        <div className="ml-auto flex items-center gap-2">
+          {/* Mobile brand logo + name */}
+          <div
+            onClick={() => onNavigate("dashboard")}
+            className="flex lg:hidden items-center gap-2 cursor-pointer flex-shrink-0"
+          >
+            <div
+              className="w-7 h-7 rounded-lg flex items-center justify-center flex-shrink-0"
+              style={{ background: "var(--primary)" }}
+            >
+              <Database size={15} className="text-white" />
+            </div>
+            <span className="font-bold text-sm text-[var(--text)] tracking-tight hidden min-[360px]:inline">
+              Schemalens
+            </span>
+          </div>
+
+          {/* Search trigger — hidden on admin page */}
+          {!isAdminPage && (
+            <button
+              onClick={() => setSearchOpen(true)}
+              className="relative hidden sm:flex items-center gap-2 pl-3 pr-3 py-2 text-sm rounded-xl
+                border border-[var(--border)] bg-[var(--surface)] text-[var(--text-subtle)]
+                hover:border-[var(--primary)]/50 hover:text-[var(--text)] transition-all w-44 md:w-64 lg:w-96 text-left"
+            >
+              <Search size={14} className="flex-shrink-0" />
+              <span className="flex-1 text-sm truncate">Search projects, SQL...</span>
+              <span className="hidden md:flex items-center gap-0.5 flex-shrink-0">
+                <kbd className="inline-flex items-center justify-center px-1.5 h-5 rounded border
+                  border-[var(--border)] bg-[var(--card)] text-[10px] font-mono text-[var(--text-subtle)]">Ctrl</kbd>
+                <kbd className="inline-flex items-center justify-center px-1.5 h-5 rounded border
+                  border-[var(--border)] bg-[var(--card)] text-[10px] font-mono text-[var(--text-subtle)]">K</kbd>
+              </span>
+            </button>
+          )}
+        </div>
+
+        <div className="ml-auto flex items-center gap-1.5 sm:gap-2 flex-shrink-0">
+          {/* Mobile search button */}
+          {!isAdminPage && (
+            <motion.button
+              whileTap={{ scale: 0.9 }}
+              onClick={() => setSearchOpen(true)}
+              className="sm:hidden w-8 h-8 rounded-xl flex items-center justify-center
+                text-[var(--text-muted)] hover:bg-[var(--surface)] hover:text-[var(--text)] transition-colors"
+              title="Search"
+              aria-label="Search"
+            >
+              <Search size={16} />
+            </motion.button>
+          )}
+
           {/* AI Assistant Button */}
           {!isAdminPage && (
             <motion.button
@@ -79,7 +125,9 @@ export default function Navbar({ onNavigate, page }: NavbarProps) {
           <motion.button whileTap={{ scale: 0.9 }}
             onClick={() => setTheme(theme === "light" ? "dark" : "light")}
             className="w-8 h-8 rounded-xl flex items-center justify-center
-              text-[var(--text-muted)] hover:bg-[var(--surface)] transition-colors">
+              text-[var(--text-muted)] hover:bg-[var(--surface)] transition-colors"
+            title={`Switch to ${theme === "dark" ? "light" : "dark"} mode`}
+            aria-label="Toggle theme">
             {theme === "dark" ? <Sun size={15} /> : <Moon size={15} />}
           </motion.button>
 

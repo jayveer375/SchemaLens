@@ -221,7 +221,9 @@ export default function Sidebar({ page, onNavigate }: SidebarProps) {
                   >
                     <div className="mt-1 ml-3 pl-3 border-l border-[var(--border)] space-y-0.5 pb-1">
                       {toolsItems.map(({ id, label, icon: Icon, badge }) => {
-                        const isLocked = id === "playground" && !isPro;
+                        const isUltimateOnly = ["generate", "d2d", "assistant"].includes(id);
+                        const isLocked = (id === "playground" && !isPro) || (isUltimateOnly && subscription.planId !== "ultimate");
+                        const lockLabel = isUltimateOnly ? "Ultimate" : "Pro";
                         return (
                           <button
                             key={id}
@@ -236,8 +238,10 @@ export default function Sidebar({ page, onNavigate }: SidebarProps) {
                             <span className="flex-1 truncate text-left">{label}</span>
                             {isLocked ? (
                               <span className="flex items-center gap-1 text-[11px] font-bold px-1.5 py-0.5 rounded"
-                                style={{ background: "rgba(201,155,94,0.18)", color: "var(--warning)", border: "1px solid rgba(201,155,94,0.30)" }}>
-                                <Lock size={9} /> Pro
+                                style={lockLabel === "Ultimate"
+                                  ? { background: "rgba(139,92,246,0.15)", color: "#8b5cf6", border: "1px solid rgba(139,92,246,0.30)" }
+                                  : { background: "rgba(201,155,94,0.18)", color: "var(--warning)", border: "1px solid rgba(201,155,94,0.30)" }}>
+                                <Lock size={9} /> {lockLabel}
                               </span>
                             ) : (
                               <span className={cn(

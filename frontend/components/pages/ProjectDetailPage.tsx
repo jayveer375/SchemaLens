@@ -17,6 +17,7 @@ import UpgradeLimitDialog from "@/components/UpgradeLimitDialog";
 import dynamic from "next/dynamic";
 import toast from "react-hot-toast";
 import { apiSaveProject } from "@/lib/api";
+import { applyCustomColumnsToSQL } from "@/lib/customization";
 
 const MonacoEditor = dynamic(() => import("@monaco-editor/react").then(m => m.default), {
   ssr: false, loading: () => <div className="p-6 space-y-2">{Array.from({length:10}).map((_,i)=><div key={i} className="skeleton h-4" style={{width:`${40+Math.random()*55}%`}}/>)}</div>
@@ -87,28 +88,33 @@ export default function ProjectDetailPage({ onNavigate }: { onNavigate: (p: stri
 
       updateFileStatus(project.id, ownerId, fileId, { status: "processing" });
       try {
+        const isAutoApply = autoApplyToAllTools ?? true;
+        const activeColsToApply = isAutoApply ? activeCustomCols : [];
+
         const resp = await fetch(file.imageUrl);
         const blob = await resp.blob();
         const form = new FormData();
         form.append("image", blob, file.name);
         form.append("dialect", project.dbType);
-        if (autoApplyToAllTools && activeCustomCols.length > 0) {
-          form.append("customColumns", JSON.stringify(activeCustomCols));
+        if (activeColsToApply.length > 0) {
+          form.append("customColumns", JSON.stringify(activeColsToApply));
         }
-        if (autoApplyToAllTools && globalPromptRules) {
+        if (isAutoApply && globalPromptRules) {
           form.append("customRules", globalPromptRules);
         }
         const t0 = Date.now();
         const res = await fetch("/api/analyze", { method: "POST", body: form });
         const data = await res.json();
         if (!res.ok || !data.sql) throw new Error(data.error || "Analysis failed");
-        const { tables, fks, cols } = parseSQLStats(data.sql);
+
+        const finalSql = applyCustomColumnsToSQL(data.sql, activeColsToApply, project.dbType);
+        const { tables, fks, cols } = parseSQLStats(finalSql);
         const pt = Date.now() - t0;
         updateFileStatus(project.id, ownerId, fileId, {
-          status: "completed", sql: data.sql, processingTime: pt,
+          status: "completed", sql: finalSql, processingTime: pt,
           completedAt: Date.now(),
           stats: { tables, relationships: fks, attributes: cols },
-          versions: [{ sql: data.sql, generatedAt: Date.now() }],
+          versions: [{ sql: finalSql, generatedAt: Date.now() }],
         });
         incrementConversions();
         // ── Upload image to DB + save conversion with image_id ──
@@ -217,27 +223,32 @@ export default function ProjectDetailPage({ onNavigate }: { onNavigate: (p: stri
     if (!project) return;
     updateFileStatus(project.id, ownerId, file.id, { status: "processing" });
     try {
+      const isAutoApply = autoApplyToAllTools ?? true;
+      const activeColsToApply = isAutoApply ? activeCustomCols : [];
+
       const resp = await fetch(file.imageUrl);
       const blob = await resp.blob();
       const form = new FormData();
       form.append("image", blob, file.name);
       form.append("dialect", project.dbType);
-      if (autoApplyToAllTools && activeCustomCols.length > 0) {
-        form.append("customColumns", JSON.stringify(activeCustomCols));
+      if (activeColsToApply.length > 0) {
+        form.append("customColumns", JSON.stringify(activeColsToApply));
       }
-      if (autoApplyToAllTools && globalPromptRules) {
+      if (isAutoApply && globalPromptRules) {
         form.append("customRules", globalPromptRules);
       }
       const t0 = Date.now();
       const res = await fetch("/api/analyze", { method: "POST", body: form });
       const data = await res.json();
       if (!res.ok || !data.sql) throw new Error(data.error || "Failed");
-      const { tables, fks, cols } = parseSQLStats(data.sql);
+
+      const finalSql = applyCustomColumnsToSQL(data.sql, activeColsToApply, project.dbType);
+      const { tables, fks, cols } = parseSQLStats(finalSql);
       const prev = file.versions || [];
       updateFileStatus(project.id, ownerId, file.id, {
-        status: "completed", sql: data.sql, processingTime: Date.now() - t0,
+        status: "completed", sql: finalSql, processingTime: Date.now() - t0,
         completedAt: Date.now(), stats: { tables, relationships: fks, attributes: cols },
-        versions: [...prev, { sql: data.sql, generatedAt: Date.now() }],
+        versions: [...prev, { sql: finalSql, generatedAt: Date.now() }],
       });
       syncToDb();  // ← save to PostgreSQL
       toast.success("Regenerated!");

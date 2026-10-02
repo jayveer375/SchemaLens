@@ -16,6 +16,7 @@ import { canConvert, conversionsLeft, canCreateProject, canGenerateAI, aiGenerat
 import type { Project, DBType } from "@/lib/types";
 import UpgradeLimitDialog from "@/components/UpgradeLimitDialog";
 import { InlineDiagramViewer, type DiagramType } from "@/components/ERDiagramModal";
+import { applyCustomColumnsToSQL, applyCustomColumnsToMermaid } from "@/lib/customization";
 import dynamic from "next/dynamic";
 import toast from "react-hot-toast";
 
@@ -401,6 +402,9 @@ export default function GeneratePage({ onNavigate }: { onNavigate: (p: string) =
 
     try {
       const t0 = Date.now();
+      const isAutoApply = autoApplyToAllTools ?? true;
+      const activeColsToApply = isAutoApply ? activeCustomCols : [];
+
       const res = await fetch("/api/generate", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -408,8 +412,8 @@ export default function GeneratePage({ onNavigate }: { onNavigate: (p: string) =
           description: description.trim(),
           dialect: selectedDb,
           diagramType,
-          customColumns: autoApplyToAllTools ? activeCustomCols : [],
-          customRules: autoApplyToAllTools ? globalPromptRules : "",
+          customColumns: activeColsToApply,
+          customRules: isAutoApply ? globalPromptRules : "",
         }),
       });
       const data = await res.json();
@@ -417,12 +421,16 @@ export default function GeneratePage({ onNavigate }: { onNavigate: (p: string) =
 
       if (!res.ok || !data.sql || !data.mermaid) throw new Error(data.error || "Generation failed");
 
-      const { tables, fks, cols } = parseSQLStats(data.sql);
+      // Dynamically guarantee custom columns are in both SQL and Mermaid
+      const finalSql = applyCustomColumnsToSQL(data.sql, activeColsToApply, selectedDb);
+      const finalMermaid = applyCustomColumnsToMermaid(data.mermaid, activeColsToApply, diagramType);
+
+      const { tables, fks, cols } = parseSQLStats(finalSql);
       const generated: GenerateResult = {
         id: genId(),
         description: description.trim(),
-        mermaid: data.mermaid,
-        sql: data.sql,
+        mermaid: finalMermaid,
+        sql: finalSql,
         tables: data.tables ?? [],
         dialect: selectedDb,
         timestamp: Date.now(),
@@ -441,7 +449,7 @@ export default function GeneratePage({ onNavigate }: { onNavigate: (p: string) =
           user_id: numericId,
           tool: "generate",
           action_label: `"${description.trim().slice(0, 60)}" → ${selectedDb.toUpperCase()}`,
-          result_sql: data.sql,
+          result_sql: finalSql,
           dialect_from: "text",
           dialect_to: selectedDb,
           tables_count: tables,
@@ -452,7 +460,7 @@ export default function GeneratePage({ onNavigate }: { onNavigate: (p: string) =
         // ── Save to conversions table in DB ──
         apiSaveConversion({
           user_id: numericId,
-          generated_ddl: data.sql,
+          generated_ddl: finalSql,
           dialect: selectedDb,
           success: true,
           tables_count: tables,
@@ -577,6 +585,8 @@ export default function GeneratePage({ onNavigate }: { onNavigate: (p: string) =
 
     try {
       const currentSQL = result?.sql || "";
+      const isAutoApply = autoApplyToAllTools ?? true;
+      const activeColsToApply = isAutoApply ? activeCustomCols : [];
       const res = await fetch("/api/assistant", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -584,8 +594,8 @@ export default function GeneratePage({ onNavigate }: { onNavigate: (p: string) =
           mode: "generate",
           input: aiPrompt,
           schema: currentSQL,
-          customColumns: autoApplyToAllTools ? activeCustomCols : [],
-          customRules: autoApplyToAllTools ? globalPromptRules : "",
+          customColumns: activeColsToApply,
+          customRules: isAutoApply ? globalPromptRules : "",
         }),
       });
 
@@ -595,7 +605,8 @@ export default function GeneratePage({ onNavigate }: { onNavigate: (p: string) =
       }
 
       const data = await res.json();
-      setAiGeneratedSQL(data.sql || "");
+      const finalAssistantSql = applyCustomColumnsToSQL(data.sql || "", activeColsToApply, selectedDb);
+      setAiGeneratedSQL(finalAssistantSql);
       
       // Increment AI generation credits with cost amount
       incrementAIGenerations(cost);

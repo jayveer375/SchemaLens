@@ -12,6 +12,7 @@ import HowItWorks from "@/components/HowItWorks";
 import ExamplePreview from "@/components/ExamplePreview";
 import { useStore, AnalysisResult, HistoryEntry } from "@/lib/store";
 import { parseSQLStats } from "@/lib/utils";
+import { applyCustomColumnsToSQL } from "@/lib/customization";
 import toast from "react-hot-toast";
 
 export default function HomePage() {
@@ -37,12 +38,15 @@ export default function HomePage() {
     setError(null);
 
     try {
+      const isAutoApply = autoApplyToAllTools ?? true;
+      const activeColsToApply = isAutoApply ? activeCustomCols : [];
+
       const form = new FormData();
       form.append("image", f);
-      if (autoApplyToAllTools && activeCustomCols.length > 0) {
-        form.append("customColumns", JSON.stringify(activeCustomCols));
+      if (activeColsToApply.length > 0) {
+        form.append("customColumns", JSON.stringify(activeColsToApply));
       }
-      if (autoApplyToAllTools && globalPromptRules) {
+      if (isAutoApply && globalPromptRules) {
         form.append("customRules", globalPromptRules);
       }
 
@@ -54,14 +58,15 @@ export default function HomePage() {
         throw new Error(data.error ?? "Analysis failed");
       }
 
-      const { tables, fks, cols } = parseSQLStats(data.sql);
+      const finalSql = applyCustomColumnsToSQL(data.sql, activeColsToApply, "postgresql");
+      const { tables, fks, cols } = parseSQLStats(finalSql);
       const processingTime = Date.now() - t0;
 
       const result: AnalysisResult = {
         id: `${Date.now()}`,
         filename: f.name,
         imageUrl: url,
-        sql: data.sql,
+        sql: finalSql,
         timestamp: Date.now(),
         processingTime,
         stats: {

@@ -30,6 +30,7 @@ import ProfilePage from "@/components/pages/ProfilePage";
 import UsagePage from "@/components/pages/UsagePage";
 import D2DPage from "@/components/pages/D2DPage";
 import AIAssistantPanel from "@/components/AIAssistantPanel";
+import LockedFeatureScreen from "@/components/LockedFeatureScreen";
 
 import { useStore } from "@/lib/store";
 import dynamic from "next/dynamic";
@@ -174,7 +175,97 @@ export default function RootPage() {
 
   const renderPage = () => {
     const pageProps = { onNavigate: navigate, onNavigateBack: navigateBack };
-    
+
+    // ── Plan gates ──────────────────────────────────────────────────────────
+    const { getSubscription } = useStore.getState();
+    const planId = getSubscription().planId;
+
+    // Pages that require Pro or higher
+    const proPages: AppPage[] = ["playground", "history"];
+    // Pages that require Ultimate
+    const ultimatePages: AppPage[] = ["generate", "d2d", "assistant"];
+
+    if (planId === "free" && proPages.includes(appPage)) {
+      const titles: Record<string, string> = {
+        playground: "SQL Playground",
+        history: "History & Audit Log",
+      };
+      const descs: Record<string, string> = {
+        playground: "Write, run and visualize SQL with Monaco editor and live ER diagrams — available on the Pro plan.",
+        history: "View, search and re-use every past conversion across all tools — available on the Pro plan.",
+      };
+      const features: Record<string, { icon: string; text: string }[]> = {
+        playground: [
+          { icon: "⚡", text: "Monaco SQL editor" },
+          { icon: "🔀", text: "Live ER diagrams" },
+          { icon: "📋", text: "Format & download SQL" },
+          { icon: "📜", text: "Query history (50 runs)" },
+        ],
+        history: [
+          { icon: "🕐", text: "Full conversion history" },
+          { icon: "🔍", text: "Search & filter by tool" },
+          { icon: "📋", text: "Copy or download SQL" },
+          { icon: "🗑️", text: "Delete or clear history" },
+        ],
+      };
+      return (
+        <LockedFeatureScreen
+          title={titles[appPage]}
+          description={descs[appPage]}
+          features={features[appPage]}
+          requiredPlan="pro"
+          upgradePrice="₹199 / month"
+          onNavigateBack={navigateBack}
+          onUpgrade={() => navigate("pricing")}
+        />
+      );
+    }
+
+    if (planId !== "ultimate" && ultimatePages.includes(appPage)) {
+      const titles: Record<string, string> = {
+        generate:  "Schema Generator",
+        d2d:       "Diagram to Diagram",
+        assistant: "AI Assistant",
+      };
+      const descs: Record<string, string> = {
+        generate:  "Generate ER diagrams and SQL from plain English descriptions — available on the Ultimate plan.",
+        d2d:       "Convert diagrams between types (ER, Flowchart, DFD, Class, Sequence) — available on the Ultimate plan.",
+        assistant: "Ask questions about your schema, get SQL queries and instant AI help — available on the Ultimate plan.",
+      };
+      const features: Record<string, { icon: string; text: string }[]> = {
+        generate:  [
+          { icon: "✏️", text: "Describe in plain English" },
+          { icon: "📊", text: "Auto ER diagram generation" },
+          { icon: "💾", text: "Multi-dialect SQL DDL" },
+          { icon: "🤖", text: "AI SQL assistant" },
+        ],
+        d2d: [
+          { icon: "🔀", text: "ER → Flowchart → DFD" },
+          { icon: "🏗️", text: "Class & Sequence diagrams" },
+          { icon: "📤", text: "Export & share diagrams" },
+          { icon: "⚡", text: "AI-powered conversion" },
+        ],
+        assistant: [
+          { icon: "🤖", text: "Schema Q&A" },
+          { icon: "✍️", text: "SQL query generation" },
+          { icon: "🔍", text: "Schema analysis" },
+          { icon: "💡", text: "Best practice tips" },
+        ],
+      };
+      return (
+        <LockedFeatureScreen
+          title={titles[appPage]}
+          description={descs[appPage]}
+          features={features[appPage]}
+          requiredPlan="ultimate"
+          upgradePrice="₹699 / month"
+          onNavigateBack={navigateBack}
+          onUpgrade={() => navigate("pricing")}
+        />
+      );
+    }
+    // ── End plan gates ──────────────────────────────────────────────────────
+
     switch (appPage) {
       case "dashboard":      return <DashboardPage {...pageProps} />;
       case "projects":       return <ProjectsPage  {...pageProps} />;

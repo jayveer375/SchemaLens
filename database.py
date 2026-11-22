@@ -15,6 +15,13 @@ DATABASE_URL = os.getenv(
     "postgresql://postgres:bhavesh2008@localhost:5432/er_ai_studio"
 )
 
+# SQLAlchemy 2.x uses psycopg3 by default for postgresql://.
+# Force psycopg2 since that's what's installed.
+if DATABASE_URL and DATABASE_URL.startswith("postgresql://"):
+    DATABASE_URL = DATABASE_URL.replace("postgresql://", "postgresql+psycopg2://", 1)
+elif DATABASE_URL and DATABASE_URL.startswith("postgres://"):
+    DATABASE_URL = DATABASE_URL.replace("postgres://", "postgresql+psycopg2://", 1)
+
 engine = create_engine(
     DATABASE_URL,
     pool_size=10,

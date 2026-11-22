@@ -18,10 +18,13 @@ type InputMode = "text" | "document" | "image";
 type ViewMode  = "diagram" | "sql";
 
 const DIAGRAM_TYPES = [
-  { key: "er",        label: "ER Diagram",    desc: "Entities & relationships", erType: "er"        as DiagramType },
-  { key: "flowchart", label: "Flowchart",     desc: "Process & decision flow",  erType: "flowchart" as DiagramType },
-  { key: "dfd",       label: "Data Flow DFD", desc: "Data movement & stores",   erType: "dfd1"      as DiagramType },
-  { key: "class",     label: "Class Diagram", desc: "OOP class structure",       erType: "class"     as DiagramType },
+  { key: "er",           label: "ER Diagram",      desc: "Entities & relationships",  erType: "er"        as DiagramType, plan: "pro"      },
+  { key: "flowchart",    label: "Flowchart",        desc: "Process & decision flow",   erType: "flowchart" as DiagramType, plan: "free"     },
+  { key: "dfd",          label: "Data Flow DFD",    desc: "Data movement & stores",    erType: "dfd1"      as DiagramType, plan: "ultimate" },
+  { key: "class",        label: "Class Diagram",    desc: "OOP class structure",        erType: "class"     as DiagramType, plan: "pro"      },
+  { key: "sequence",     label: "Sequence",         desc: "Time-based interactions",   erType: "flowchart" as DiagramType, plan: "ultimate" },
+  { key: "architecture", label: "Architecture",     desc: "System components",         erType: "er"        as DiagramType, plan: "ultimate" },
+  { key: "usecase",      label: "Use Case",         desc: "User interactions",         erType: "flowchart" as DiagramType, plan: "ultimate" },
 ];
 
 const SQL_DIALECTS = [
@@ -34,7 +37,15 @@ const SQL_DIALECTS = [
 const MAX_FILE_SIZE = 5 * 1024 * 1024;
 const ALLOWED_IMG = ["image/png", "image/jpeg", "image/webp", "image/gif"];
 
-// Plan-based feature access component removed - all features free
+// Plan access helper
+function isDiagramLocked(diagramPlan: string, userPlan: string): boolean {
+  const order = ["free", "pro", "ultimate"];
+  return order.indexOf(userPlan) < order.indexOf(diagramPlan);
+}
+
+function lockLabel(diagramPlan: string): string {
+  return diagramPlan === "ultimate" ? "Ultimate" : "Pro";
+}
 
 export default function D2DPage({ onNavigate, onNavigateBack }: D2DPageProps) {
   const {
@@ -44,6 +55,8 @@ export default function D2DPage({ onNavigate, onNavigateBack }: D2DPageProps) {
     setMermaidCode, setIsAnalyzing, setIsGenerating, setD2DError: setError,
     addDiagram, clearD2DState, theme,
   } = useStore();
+
+  const planId = subscription?.planId ?? "free";
 
   const [inputMode, setInputMode]       = useState<InputMode>("text");
   const [text, setText]                 = useState("");
@@ -117,17 +130,24 @@ export default function D2DPage({ onNavigate, onNavigateBack }: D2DPageProps) {
       const d1 = await r1.json();
       if (!r1.ok) throw new Error(d1.error || "Analysis failed");
 
-      // Filter to only our 4 supported types
+      // Filter to only our supported types, then pick best unlocked one for user's plan
       const validKeys = DIAGRAM_TYPES.map(d => d.key);
       const raw: string[] = d1.recommended_types || [];
       const mapped = raw.map(t => {
         if (t === "schema") return "er";
-        if (["activity","process","state","sequence","usecase"].includes(t)) return "flowchart";
+        if (["activity","process","state"].includes(t)) return "flowchart";
+        if (t === "sequence") return "sequence";
+        if (t === "usecase") return "usecase";
+        if (["architecture","component","network"].includes(t)) return "architecture";
         if (["architecture","component","network"].includes(t)) return "dfd";
         return validKeys.includes(t) ? t : null;
       }).filter(Boolean) as string[];
       const types = [...new Set(mapped)];
-      const best = types[0] || "er";
+      // Pick the best type the user can actually use
+      const best = types.find(t => {
+        const meta = DIAGRAM_TYPES.find(d => d.key === t);
+        return meta && !isDiagramLocked(meta.plan, planId);
+      }) || "flowchart";
 
       setRecommendedTypes(types.length ? types : [best]);
       setExtractedData(d1.extracted || {});
@@ -155,7 +175,13 @@ export default function D2DPage({ onNavigate, onNavigateBack }: D2DPageProps) {
 
   // ── switch diagram type ──────────────────────────────────────────────────
   const handleGenerate = async (type?: string) => {
-    const useType = type || selectedType || "er";
+    const useType = type || selectedType || "flowchart";
+    // Guard: don't generate if the diagram type is locked for this plan
+    const diagramMeta = DIAGRAM_TYPES.find(d => d.key === useType);
+    if (diagramMeta && isDiagramLocked(diagramMeta.plan, planId)) {
+      onNavigate?.("pricing");
+      return;
+    }
     setIsGenerating(true); setError(null); setSqlCode("");
     try {
       const content = await getContent();
@@ -320,7 +346,7 @@ export default function D2DPage({ onNavigate, onNavigateBack }: D2DPageProps) {
             {/* Mobile Dropdown (sm:hidden) */}
             <div className="sm:hidden relative mb-2">
               <select
-                value={selectedType || "er"}
+                value={selectedType || "flowchart"}
                 onChange={(e) => {
                   setSelectedType(e.target.value);
                   if (diagramUid) handleGenerate(e.target.value);
@@ -329,8 +355,10 @@ export default function D2DPage({ onNavigate, onNavigateBack }: D2DPageProps) {
                 className="w-full appearance-none px-4 py-3 pr-10 rounded-xl text-base font-semibold border-2 border-[var(--border)] bg-[var(--card)] text-[var(--text)] focus:border-[var(--primary)] focus:outline-none transition-all shadow-sm"
               >
                 {DIAGRAM_TYPES.map(d => (
-                  <option key={d.key} value={d.key} className="bg-[var(--card)] text-[var(--text)]">
-                    {d.label} {recommendedTypes.includes(d.key) ? "(AI recommended)" : ""}
+                  <option key={d.key} value={d.key} disabled={isDiagramLocked(d.plan, planId)} className="bg-[var(--card)] text-[var(--text)]">
+                    {d.label}
+                    {isDiagramLocked(d.plan, planId) ? ` 🔒 ${lockLabel(d.plan)}` : ""}
+                    {recommendedTypes.includes(d.key) ? " (AI recommended)" : ""}
                   </option>
                 ))}
               </select>
@@ -341,25 +369,45 @@ export default function D2DPage({ onNavigate, onNavigateBack }: D2DPageProps) {
 
             {/* Desktop / Tablet List (hidden sm:block) */}
             <div className="hidden sm:block space-y-2">
-              {/* All diagram types - no locks */}
-              {DIAGRAM_TYPES.map(d => (
-                <button key={d.key}
-                  onClick={() => { setSelectedType(d.key); if (diagramUid) handleGenerate(d.key); }}
-                  disabled={isWorking}
-                  className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition border
-                    ${selectedType === d.key
-                      ? "bg-violet-50 dark:bg-violet-900/30 border-violet-300 dark:border-violet-600 text-violet-700 dark:text-violet-200"
-                      : "border-gray-100 dark:border-gray-800 hover:border-gray-300 dark:hover:border-gray-600 text-gray-600 dark:text-gray-400"}`}>
-                  <div className="flex-1 text-left">
-                    <div className="font-semibold">{d.label}</div>
-                    <div className="text-xs text-gray-400 font-normal">{d.desc}</div>
-                  </div>
-                  {recommendedTypes.includes(d.key) && (
-                    <span className="text-[10px] bg-green-100 dark:bg-green-900/40 text-green-600 dark:text-green-400 px-1.5 py-0.5 rounded-full font-bold">AI</span>
-                  )}
-                  {selectedType === d.key && <Check className="w-4 h-4 text-violet-500 shrink-0" />}
-                </button>
-              ))}
+              {/* All diagram types - locked by plan */}
+              {DIAGRAM_TYPES.map(d => {
+                const locked = isDiagramLocked(d.plan, planId);
+                return (
+                  <button key={d.key}
+                    onClick={() => {
+                      if (locked) { onNavigate?.("pricing"); return; }
+                      setSelectedType(d.key);
+                      if (diagramUid) handleGenerate(d.key);
+                    }}
+                    disabled={isWorking && !locked}
+                    className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition border
+                      ${locked
+                        ? "border-gray-100 dark:border-gray-800 opacity-50 cursor-not-allowed bg-gray-50 dark:bg-gray-800/30"
+                        : selectedType === d.key
+                          ? "bg-violet-50 dark:bg-violet-900/30 border-violet-300 dark:border-violet-600 text-violet-700 dark:text-violet-200"
+                          : "border-gray-100 dark:border-gray-800 hover:border-gray-300 dark:hover:border-gray-600 text-gray-600 dark:text-gray-400"}`}>
+                    <div className="flex-1 text-left">
+                      <div className="font-semibold">{d.label}</div>
+                      <div className="text-xs text-gray-400 font-normal">{d.desc}</div>
+                    </div>
+                    {locked ? (
+                      <span className="flex items-center gap-1 text-[10px] font-bold px-1.5 py-0.5 rounded flex-shrink-0"
+                        style={d.plan === "ultimate"
+                          ? { background: "rgba(139,92,246,0.15)", color: "#8b5cf6", border: "1px solid rgba(139,92,246,0.30)" }
+                          : { background: "rgba(99,102,241,0.12)", color: "#6366f1", border: "1px solid rgba(99,102,241,0.25)" }}>
+                        🔒 {lockLabel(d.plan)}
+                      </span>
+                    ) : (
+                      <>
+                        {recommendedTypes.includes(d.key) && (
+                          <span className="text-[10px] bg-green-100 dark:bg-green-900/40 text-green-600 dark:text-green-400 px-1.5 py-0.5 rounded-full font-bold">AI</span>
+                        )}
+                        {selectedType === d.key && <Check className="w-4 h-4 text-violet-500 shrink-0" />}
+                      </>
+                    )}
+                  </button>
+                );
+              })}
             </div>
 
             {diagramUid && selectedType && (

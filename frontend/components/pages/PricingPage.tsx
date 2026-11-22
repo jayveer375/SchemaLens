@@ -47,6 +47,11 @@ const FEATURE_ROWS = [
   { label: "Version history",           free: false,        pro: true,           ultimate: true },
   { label: "Priority queue",            free: false,        pro: true,           ultimate: true },
   { label: "Advanced export options",   free: false,        pro: true,           ultimate: true },
+  { label: "D2D — Flowchart",           free: true,         pro: true,           ultimate: true },
+  { label: "D2D — ER & Class diagrams", free: false,        pro: true,           ultimate: true },
+  { label: "D2D — Advanced diagrams",   free: false,        pro: false,          ultimate: true },
+  { label: "Schema Generator (AI)",     free: false,        pro: false,          ultimate: true },
+  { label: "AI Assistant",              free: false,        pro: false,          ultimate: true },
   { label: "Support",                   free: "Community",  pro: "Priority",     ultimate: "VIP 24/7" },
 ];
 
@@ -395,6 +400,8 @@ export default function PricingPage({ onNavigateBack }: PricingPageProps) {
               "History & audit logs",
               "ZIP & advanced exports",
               "Highest priority queue",
+              "D2D — all diagram types (incl. Sequence, Architecture, DFD)",
+              "Schema Generator & AI Assistant",
               "VIP 24/7 priority support",
             ].map((f) => (
               <li key={f} className="flex items-center gap-2.5 text-sm text-[var(--text-muted)]">

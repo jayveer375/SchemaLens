@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { buildCustomColumnsPrompt } from "@/lib/customization";
+import { buildCustomColumnsPrompt, applyCustomColumnsToSQL, applyCustomColumnsToMermaid } from "@/lib/customization";
 import { CustomColumn } from "@/lib/types";
 
 const MISTRAL_MODEL   = "open-mistral-7b";
@@ -384,9 +384,13 @@ export async function POST(req: NextRequest) {
           return NextResponse.json({ error: "AI response missing required fields" }, { status: 500 });
         }
 
+        const activeCols = (customColumns || []).filter((c) => c && c.enabled);
+        const finalSql = applyCustomColumnsToSQL(parsed.sql, activeCols, dialect);
+        const finalMermaid = applyCustomColumnsToMermaid(parsed.mermaid, activeCols, diagramType);
+
         return NextResponse.json({
-          mermaid: parsed.mermaid,
-          sql: parsed.sql,
+          mermaid: finalMermaid,
+          sql: finalSql,
           tables: parsed.tables ?? [],
           relationships: parsed.relationships ?? [],
           dialect,
@@ -435,9 +439,13 @@ CREATE TABLE profiles (
     last_name VARCHAR(255)
 );`;
 
+    const activeCols = (customColumns || []).filter((c) => c && c.enabled);
+    const finalFallbackSQL = applyCustomColumnsToSQL(fallbackSQL, activeCols, dialect);
+    const finalFallbackMermaid = applyCustomColumnsToMermaid(fallbackMermaid, activeCols, diagramType);
+
     return NextResponse.json({
-      mermaid: fallbackMermaid,
-      sql: fallbackSQL,
+      mermaid: finalFallbackMermaid,
+      sql: finalFallbackSQL,
       tables: ["users", "profiles"],
       relationships: [{"from":"users","to":"profiles","type":"one-to-one","label":"has"}],
       dialect,

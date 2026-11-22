@@ -122,7 +122,7 @@ CRITICAL SQLite rules — every single one must be obeyed:
 • Output ONLY raw Oracle DDL. No markdown, no prose.`,
 };
 
-import { buildCustomColumnsPrompt } from "@/lib/customization";
+import { buildCustomColumnsPrompt, applyCustomColumnsToSQL } from "@/lib/customization";
 import { CustomColumn } from "@/lib/types";
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -189,10 +189,10 @@ F4. Follow the FK placement rules (inline vs ALTER TABLE) stated in the dialect 
 ━━━ DIAGRAM FIDELITY & CUSTOM COLUMNS RULES ━━━━━━━━━━━━━━━━━━━━━━
 
 D1. One TABLE per visible entity box.
-D2. Columns: Include all visible attribute ovals connected to that entity, PLUS any enabled User Custom Columns specified in the customization section above when relevant to the tables.
+D2. Columns: Include all visible attribute ovals connected to that entity.
 D3. Copy the EXACT text visible in the diagram for every name. Do not fix spelling,
     change case, expand abbreviations, or pluralise. OCR what you see literally.
-D4. Apply the User Customization Columns and Directives to the generated tables.
+D4. User Custom Columns: Include each active configured custom column in EVERY single table generated, regardless of whether it is visible or assigned in the diagram image.
 
 ════════════════════════════════════════════════════════════════════
 PHASE 3 — UNCERTAIN ELEMENTS
@@ -238,10 +238,11 @@ export async function POST(req: NextRequest) {
     }
 
     let customPrompt = "";
+    let parsedCols: CustomColumn[] = [];
     if (customColsRaw || customRulesRaw) {
       try {
-        const cols: CustomColumn[] = customColsRaw ? JSON.parse(customColsRaw) : [];
-        customPrompt = buildCustomColumnsPrompt(cols, customRulesRaw || "");
+        parsedCols = customColsRaw ? JSON.parse(customColsRaw) : [];
+        customPrompt = buildCustomColumnsPrompt(parsedCols, customRulesRaw || "");
       } catch (e) {
         console.warn("Failed to parse customColumns in analyze:", e);
       }
@@ -295,10 +296,14 @@ export async function POST(req: NextRequest) {
     }
 
     const data = await res.json();
-    const sql: string = data?.choices?.[0]?.message?.content?.trim() ?? "";
+    let sql: string = data?.choices?.[0]?.message?.content?.trim() ?? "";
 
     if (!sql) {
       return NextResponse.json({ error: "Empty response from Mistral" }, { status: 500 });
+    }
+
+    if (parsedCols.length > 0) {
+      sql = applyCustomColumnsToSQL(sql, parsedCols, dialect);
     }
 
     return NextResponse.json({

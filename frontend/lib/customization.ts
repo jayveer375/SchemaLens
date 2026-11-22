@@ -58,45 +58,365 @@ export const PRESET_CUSTOM_COLUMNS: Omit<CustomColumn, "id" | "createdAt">[] = [
   },
 ];
 
+function escapeRegex(str: string): string {
+  return str.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
+
 /**
- * Builds a prompt section describing user's active custom columns and rules
- * to inject into AI prompts (Quick Convert, Generate, Migrate, Assistant, etc.)
+ * Builds a compact, low-token prompt section instructing the AI to inject user's active
+ * custom columns into EVERY table and entity unconditionally.
  */
 export function buildCustomColumnsPrompt(columns: CustomColumn[] = [], globalRules: string = ""): string {
-  const active = columns.filter((c) => c && c.enabled);
+  const active = (columns || []).filter((c) => c && c.enabled);
   if (active.length === 0 && !globalRules?.trim()) {
     return "";
   }
 
-  let prompt = "\n\n════ USER CUSTOMIZATION & CUSTOM COLUMNS (MANDATORY APPLIED) ════\n";
-  prompt += "The user has configured the following custom columns and schema directives.\n";
-  prompt += "You MUST apply and incorporate these custom columns in all generated tables/entities whenever relevant or requested:\n\n";
-
+  let prompt = "\n\n════ USER CONFIGURED CUSTOM COLUMNS (MANDATORY IN EVERY TABLE) ════\n";
   if (active.length > 0) {
-    prompt += "Active Custom Columns:\n";
+    prompt += "CRITICAL: The following custom column(s) MUST be included in EACH AND EVERY table/entity defined in the script and diagram, whether mentioned or drawn or not:\n";
     active.forEach((col, idx) => {
       const constraints: string[] = [];
       if (col.constraints?.primaryKey) constraints.push("PRIMARY KEY");
-      if (col.constraints?.notNull) constraints.push("NOT NULL");
-      if (col.constraints?.unique) constraints.push("UNIQUE");
+      if (col.constraints?.notNull && !col.constraints?.primaryKey) constraints.push("NOT NULL");
+      if (col.constraints?.unique && !col.constraints?.primaryKey) constraints.push("UNIQUE");
       if (col.constraints?.indexed) constraints.push("INDEXED");
       const constraintStr = constraints.length > 0 ? ` [${constraints.join(", ")}]` : "";
-      const defaultStr = col.defaultValue?.trim() ? ` DEFAULT ${col.defaultValue.trim()}` : "";
-      const descStr = col.description?.trim() ? ` — Usage/Context: ${col.description.trim()}` : "";
+      
+      let defaultStr = "";
+      if (col.defaultValue && col.defaultValue.trim()) {
+        const val = col.defaultValue.trim();
+        const isQuoted = /^['"].*['"]$/.test(val);
+        const isNumeric = /^-?\d+(\.\d+)?$/.test(val);
+        const isKeyword = /^(CURRENT_TIMESTAMP|NOW\(\)|CURRENT_DATE|NULL|TRUE|FALSE|gen_random_uuid\(\)|newid\(\)|sysdate)$/i.test(val);
+        defaultStr = ` DEFAULT ${isQuoted || isNumeric || isKeyword ? val : `'${val.replace(/'/g, "''")}'`}`;
+      }
 
-      prompt += `${idx + 1}. Column \`${col.name}\` (${col.dataType})${constraintStr}${defaultStr}${descStr}\n`;
+      prompt += `${idx + 1}. Column \`${col.name}\` (${col.dataType})${constraintStr}${defaultStr}\n`;
     });
-
-    prompt += "\nSpecific Instructions for Custom Columns:\n";
-    prompt += "- Check each table or entity being created, converted, or migrated.\n";
-    prompt += "- If an entity represents or interacts with the context described in a custom column (or whenever creating entity tables), include this column.\n";
-    prompt += "- Strictly respect the defined data type, constraints (PRIMARY KEY, NOT NULL, UNIQUE, etc.) and default values.\n";
+    prompt += "- Include these column(s) as standard columns in every table and Mermaid entity.\n";
   }
 
   if (globalRules?.trim()) {
-    prompt += `\nAdditional Global Schema Rules:\n${globalRules.trim()}\n`;
+    prompt += `Additional User Rules:\n${globalRules.trim()}\n`;
   }
 
   prompt += "═════════════════════════════════════════════════════════════════\n";
   return prompt;
+}
+
+/**
+ * Formats a custom column definition according to the target SQL dialect.
+ */
+export function formatCustomColumnSQL(col: CustomColumn, dialect: string = "postgresql"): string {
+  const d = (dialect || "postgresql").toLowerCase();
+  let type = (col.dataType || "VARCHAR(255)").trim();
+
+  // Dialect-specific type adaptations
+  if (/^VARCHAR$/i.test(type)) {
+    if (d === "oracle") type = "VARCHAR2(255)";
+    else if (d === "mssql") type = "NVARCHAR(255)";
+    else if (d === "sqlite") type = "TEXT";
+    else type = "VARCHAR(255)";
+  } else if (/^VARCHAR\(\d+\)$/i.test(type) && d === "oracle") {
+    type = type.replace(/^VARCHAR/i, "VARCHAR2");
+  } else if (/^TIMESTAMP$/i.test(type)) {
+    if (d === "mssql") type = "DATETIME2";
+    else if (d === "sqlite") type = "TEXT";
+    else if (d === "oracle") type = "TIMESTAMP";
+    else type = "TIMESTAMP";
+  } else if (/^BOOLEAN$/i.test(type)) {
+    if (d === "oracle") type = "NUMBER(1)";
+    else if (d === "mssql") type = "BIT";
+    else if (d === "sqlite") type = "INTEGER";
+    else if (d === "mysql") type = "TINYINT(1)";
+  } else if (/^UUID$/i.test(type)) {
+    if (d === "mysql" || d === "sqlite") type = "VARCHAR(36)";
+    else if (d === "mssql") type = "UNIQUEIDENTIFIER";
+    else if (d === "oracle") type = "VARCHAR2(36)";
+  }
+
+  const parts = [col.name, type];
+
+  // Constraints
+  if (col.constraints?.notNull && !col.constraints?.primaryKey) {
+    parts.push("NOT NULL");
+  }
+
+  if (col.constraints?.primaryKey) {
+    parts.push("PRIMARY KEY");
+  } else if (col.constraints?.unique) {
+    parts.push("UNIQUE");
+  }
+
+  // Default value
+  if (col.defaultValue !== undefined && col.defaultValue !== null && col.defaultValue.trim() !== "") {
+    const defVal = col.defaultValue.trim();
+    const isQuoted = /^['"].*['"]$/.test(defVal);
+    const isNumeric = /^-?\d+(\.\d+)?$/.test(defVal);
+    const isKeyword = /^(CURRENT_TIMESTAMP|NOW\(\)|CURRENT_DATE|NULL|TRUE|FALSE|gen_random_uuid\(\)|uuid_generate_v4\(\)|newid\(\)|sysdate)$/i.test(defVal);
+
+    if (isQuoted || isNumeric || isKeyword) {
+      parts.push(`DEFAULT ${defVal}`);
+    } else {
+      parts.push(`DEFAULT '${defVal.replace(/'/g, "''")}'`);
+    }
+  }
+
+  return parts.join(" ");
+}
+
+/**
+ * Dynamically and reliably applies active custom columns to every CREATE TABLE statement
+ * in a SQL script, without duplicating already existing columns.
+ */
+export function applyCustomColumnsToSQL(
+  sql: string,
+  columns: CustomColumn[] = [],
+  dialect: string = "postgresql"
+): string {
+  if (!sql || typeof sql !== "string") return sql;
+  const active = (columns || []).filter((c) => c && c.enabled);
+  if (active.length === 0) return sql;
+
+  const createTableRegex = /CREATE\s+(?:(?:GLOBAL\s+TEMPORARY|TEMPORARY|TEMP)\s+)?TABLE\s+(?:IF\s+NOT\s+EXISTS\s+)?([`"\[]?\w+[`"\]]?(?:\.[`"\[]?\w+[`"\]]?)?)\s*\(/gi;
+
+  let match: RegExpExecArray | null;
+  const tablesToProcess: {
+    tableName: string;
+    openParenIndex: number;
+    closeParenIndex: number;
+  }[] = [];
+
+  while ((match = createTableRegex.exec(sql)) !== null) {
+    const tableNameRaw = match[1];
+    const tableName = tableNameRaw.replace(/[`"\[\]]/g, "").split(".").pop() || tableNameRaw;
+    const openParenIndex = match.index + match[0].length - 1;
+
+    let depth = 0;
+    let inSingleQuote = false;
+    let inDoubleQuote = false;
+    let inLineComment = false;
+    let inBlockComment = false;
+    let closeParenIndex = -1;
+
+    for (let i = openParenIndex; i < sql.length; i++) {
+      const ch = sql[i];
+      const next = sql[i + 1] || "";
+
+      if (inLineComment) {
+        if (ch === "\n") inLineComment = false;
+        continue;
+      }
+      if (inBlockComment) {
+        if (ch === "*" && next === "/") {
+          inBlockComment = false;
+          i++;
+        }
+        continue;
+      }
+      if (inSingleQuote) {
+        if (ch === "'" && sql[i - 1] !== "\\") {
+          if (next === "'") { i++; }
+          else { inSingleQuote = false; }
+        }
+        continue;
+      }
+      if (inDoubleQuote) {
+        if (ch === '"' && sql[i - 1] !== "\\") {
+          inDoubleQuote = false;
+        }
+        continue;
+      }
+
+      if (ch === "-" && next === "-") {
+        inLineComment = true;
+        i++;
+        continue;
+      }
+      if (ch === "/" && next === "*") {
+        inBlockComment = true;
+        i++;
+        continue;
+      }
+      if (ch === "'") {
+        inSingleQuote = true;
+        continue;
+      }
+      if (ch === '"') {
+        inDoubleQuote = true;
+        continue;
+      }
+
+      if (ch === "(") {
+        depth++;
+      } else if (ch === ")") {
+        depth--;
+        if (depth === 0) {
+          closeParenIndex = i;
+          break;
+        }
+      }
+    }
+
+    if (closeParenIndex !== -1) {
+      tablesToProcess.push({
+        tableName,
+        openParenIndex,
+        closeParenIndex,
+      });
+    }
+  }
+
+  if (tablesToProcess.length === 0) return sql;
+
+  let result = sql;
+  const indicesToAdd: { tableName: string; colName: string }[] = [];
+
+  for (let t = tablesToProcess.length - 1; t >= 0; t--) {
+    const { tableName, openParenIndex, closeParenIndex } = tablesToProcess[t];
+    const body = result.substring(openParenIndex + 1, closeParenIndex);
+
+    const missingCols: CustomColumn[] = [];
+    for (const col of active) {
+      const colClean = col.name.trim();
+      const hasCol = new RegExp(
+        `(^|[,\\s])[\`"\\[]?${escapeRegex(colClean)}[\`"\\]]?\\s+([A-Za-z_]|[\`"\\[])`,
+        "i"
+      ).test(body);
+
+      if (!hasCol) {
+        missingCols.push(col);
+      }
+    }
+
+    if (missingCols.length === 0) continue;
+
+    const indentMatch = body.match(/\n([ \t]+)[^\s]/);
+    const indent = indentMatch ? indentMatch[1] : "    ";
+
+    const colDefs = missingCols.map((col) => {
+      if (col.constraints?.indexed) {
+        indicesToAdd.push({ tableName, colName: col.name });
+      }
+      return `${indent}${formatCustomColumnSQL(col, dialect)}`;
+    });
+
+    const constraintRegex = /\n[ \t]*(CONSTRAINT\s+\w+|PRIMARY\s+KEY\s*\(|FOREIGN\s+KEY\s*\(|UNIQUE\s*\(|KEY\s+\w+|INDEX\s+\w+)/i;
+    const constraintMatch = body.match(constraintRegex);
+
+    let newBody = "";
+    if (constraintMatch && constraintMatch.index !== undefined) {
+      const insertPos = constraintMatch.index;
+      const before = body.substring(0, insertPos).trimEnd();
+      const after = body.substring(insertPos);
+      const needsComma = !before.trimEnd().endsWith(",");
+      newBody = `${before}${needsComma ? "," : ""}\n${colDefs.join(",\n")},${after}`;
+    } else {
+      const trimmedBody = body.trimEnd();
+      const needsComma = trimmedBody.length > 0 && !trimmedBody.endsWith(",");
+      newBody = `${trimmedBody}${needsComma ? "," : ""}\n${colDefs.join(",\n")}\n`;
+    }
+
+    result =
+      result.substring(0, openParenIndex + 1) +
+      newBody +
+      result.substring(closeParenIndex);
+  }
+
+  if (indicesToAdd.length > 0) {
+    const indexStatements: string[] = [];
+    for (const { tableName, colName } of indicesToAdd) {
+      const idxName = `idx_${tableName}_${colName}`;
+      if (!new RegExp(`\\b${escapeRegex(idxName)}\\b`, "i").test(result)) {
+        indexStatements.push(`CREATE INDEX ${idxName} ON ${tableName} (${colName});`);
+      }
+    }
+    if (indexStatements.length > 0) {
+      result = `${result.trimEnd()}\n\n-- Custom Column Indexes\n${indexStatements.join("\n")}\n`;
+    }
+  }
+
+  return result;
+}
+
+/**
+ * Dynamically applies active custom columns to every entity in a Mermaid diagram,
+ * supporting erDiagram and classDiagram formats.
+ */
+export function applyCustomColumnsToMermaid(
+  mermaid: string,
+  columns: CustomColumn[] = [],
+  diagramType: string = "er"
+): string {
+  if (!mermaid || typeof mermaid !== "string") return mermaid;
+  const active = (columns || []).filter((c) => c && c.enabled);
+  if (active.length === 0) return mermaid;
+
+  const dt = (diagramType || "er").toLowerCase();
+
+  const getMermaidType = (dataType: string): string => {
+    const t = (dataType || "").toLowerCase();
+    if (t.includes("int") || t.includes("serial")) return "int";
+    if (t.includes("float") || t.includes("double") || t.includes("decimal") || t.includes("numeric")) return "float";
+    if (t.includes("bool")) return "boolean";
+    if (t.includes("date") || t.includes("time")) return "datetime";
+    return "string";
+  };
+
+  if (dt === "er" || mermaid.includes("erDiagram")) {
+    const entityRegex = /(^|\n)([ \t]*)([A-Za-z0-9_]+)\s*\{([^}]*)\}/g;
+
+    return mermaid.replace(entityRegex, (match, prefix, indent, entityName, entityBody) => {
+      let updatedBody = entityBody;
+      const linesToAdd: string[] = [];
+
+      for (const col of active) {
+        const colClean = col.name.trim();
+        const hasCol = new RegExp(`\\b${escapeRegex(colClean)}\\b`, "i").test(updatedBody);
+        if (!hasCol) {
+          const mType = getMermaidType(col.dataType);
+          let marker = "";
+          if (col.constraints?.primaryKey) marker = " PK";
+          else if (col.constraints?.unique) marker = " UK";
+          linesToAdd.push(`        ${mType} ${colClean}${marker}`);
+        }
+      }
+
+      if (linesToAdd.length === 0) return match;
+
+      const trimmedBody = updatedBody.trimEnd();
+      const bodyWithCols = trimmedBody.length > 0
+        ? `${trimmedBody}\n${linesToAdd.join("\n")}\n    `
+        : `\n${linesToAdd.join("\n")}\n    `;
+
+      return `${prefix}${indent}${entityName} {${bodyWithCols}}`;
+    });
+  } else if (dt === "class" || mermaid.includes("classDiagram")) {
+    const classRegex = /(^|\n)([ \t]*class\s+([A-Za-z0-9_]+)\s*\{)([^}]*)\}/g;
+
+    return mermaid.replace(classRegex, (match, prefix, header, className, classBody) => {
+      const linesToAdd: string[] = [];
+
+      for (const col of active) {
+        const colClean = col.name.trim();
+        const hasCol = new RegExp(`\\b${escapeRegex(colClean)}\\b`, "i").test(classBody);
+        if (!hasCol) {
+          const mType = getMermaidType(col.dataType);
+          linesToAdd.push(`        +${mType} ${colClean}`);
+        }
+      }
+
+      if (linesToAdd.length === 0) return match;
+
+      const trimmedBody = classBody.trimEnd();
+      const bodyWithCols = trimmedBody.length > 0
+        ? `${trimmedBody}\n${linesToAdd.join("\n")}\n    `
+        : `\n${linesToAdd.join("\n")}\n    `;
+
+      return `${prefix}${header}${bodyWithCols}}`;
+    });
+  }
+
+  return mermaid;
 }

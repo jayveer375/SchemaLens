@@ -17,6 +17,7 @@ import UpgradeLimitDialog from "@/components/UpgradeLimitDialog";
 import dynamic from "next/dynamic";
 import toast from "react-hot-toast";
 import { apiSaveConversion, apiClearQuickHistory } from "@/lib/api";
+import { applyCustomColumnsToSQL } from "@/lib/customization";
 
 const MonacoEditor = dynamic(
   () => import("@monaco-editor/react").then((m) => m.default),
@@ -127,14 +128,17 @@ export default function QuickConvertPage({ onNavigate }: { onNavigate: (p: strin
       setQcStatus("processing"); setQcError(""); setQcResult(null);
       const stopAnim = runStepAnimation();
       try {
+        const isAutoApply = autoApplyToAllTools ?? true;
+        const activeColsToApply = isAutoApply ? activeCustomCols : [];
+
         const form = new FormData();
         form.append("image", file);
         form.append("dialect", selectedDb);
-        if (autoApplyToAllTools && activeCustomCols.length > 0) {
-          form.append("customColumns", JSON.stringify(activeCustomCols));
+        if (activeColsToApply.length > 0) {
+          form.append("customColumns", JSON.stringify(activeColsToApply));
         }
         const combinedRules = [
-          autoApplyToAllTools && globalPromptRules ? globalPromptRules : "",
+          isAutoApply && globalPromptRules ? globalPromptRules : "",
           conversionPrompt.trim() ? `Custom Conversion Directives:\n${conversionPrompt.trim()}` : "",
         ].filter(Boolean).join("\n\n");
         if (combinedRules) {
@@ -145,10 +149,13 @@ export default function QuickConvertPage({ onNavigate }: { onNavigate: (p: strin
         const data = await res.json();
         stopAnim();
         if (!res.ok || !data.sql) throw new Error(data.error || "Analysis failed");
-        const { tables, fks, cols } = parseSQLStats(data.sql);
+
+        // Guarantee dynamic custom columns in every table
+        const finalSql = applyCustomColumnsToSQL(data.sql, activeColsToApply, selectedDb);
+        const { tables, fks, cols } = parseSQLStats(finalSql);
         const result: QuickConvertResult = {
           id: genId(), filename: file.name, imageUrl: url,
-          sql: data.sql, timestamp: Date.now(),
+          sql: finalSql, timestamp: Date.now(),
           processingTime: Date.now() - t0,
           stats: { tables, relationships: fks, attributes: cols },
         };

@@ -247,7 +247,7 @@ export default function ProjectsPage({ onNavigate }: { onNavigate: (p: string) =
             className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-sm font-semibold
               border border-violet-500/30 text-violet-600 dark:text-violet-400 bg-violet-500/10
               hover:bg-violet-500/20 hover:border-violet-500/50 transition-all cursor-pointer"
-            title="Import Project (Pro & Ultimate Feature)"
+            title="Import Project from ZIP, SQL, or JSON (Pro & Ultimate Feature)"
           >
             <Upload size={14} /> Import Project
             <span className="text-[10px] uppercase font-bold tracking-wider px-1.5 py-0.5 rounded-full bg-violet-500/20 text-violet-600 dark:text-violet-300">
@@ -327,6 +327,7 @@ export default function ProjectsPage({ onNavigate }: { onNavigate: (p: string) =
               </button>
               <button
                 onClick={handleImportClick}
+                title="Import Project from ZIP, SQL, or JSON (Pro & Ultimate Feature)"
                 className="flex items-center gap-1.5 px-4 py-2 rounded-xl text-sm font-semibold border border-violet-500/30 text-violet-600 dark:text-violet-400 bg-violet-500/10 hover:bg-violet-500/20 transition-all cursor-pointer"
               >
                 <Upload size={14} /> Import Project

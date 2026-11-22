@@ -533,7 +533,7 @@ export default function D2DPage({ onNavigate, onNavigateBack }: D2DPageProps) {
                         <p className="text-sm text-gray-500">Generating {SQL_DIALECTS.find(d => d.key === sqlDialect)?.label} SQL...</p>
                       </div>
                     ) : sqlCode ? (
-                      <pre className="p-4 font-mono text-xs text-green-300 bg-gray-950 leading-relaxed whitespace-pre-wrap break-words min-h-full">{sqlCode}</pre>
+                      <pre className="p-4 font-mono text-xs text-gray-800 dark:text-gray-200 bg-white dark:bg-gray-900 leading-relaxed whitespace-pre-wrap break-words min-h-full">{sqlCode}</pre>
                     ) : (
                       <div className="flex flex-col items-center justify-center h-full gap-3 p-8">
                         <Database className="w-10 h-10 text-gray-300 dark:text-gray-700" />
